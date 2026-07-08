@@ -87,6 +87,9 @@ importers:
       minio:
         specifier: ^8.0.5
         version: 8.0.7
+      multer:
+        specifier: ^2.0.2
+        version: 2.1.1
       reflect-metadata:
         specifier: ^0.2.2
         version: 0.2.2
@@ -4908,7 +4911,7 @@ snapshots:
   '@types/plist@3.0.5':
     dependencies:
       '@types/node': 24.13.2
-      xmlbuilder: 11.0.1
+      xmlbuilder: 15.1.1
     optional: true
 
   '@types/qs@6.15.1': {}
