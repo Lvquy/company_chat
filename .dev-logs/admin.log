@@ -1,0 +1,13 @@
+$ pnpm --filter admin dev
+$ next dev
+   ▲ Next.js 15.4.1
+   - Local:        http://localhost:3000
+   - Network:      http://192.168.1.15:3000
+
+ ✓ Starting...
+ ✓ Ready in 1175ms
+ ○ Compiling / ...
+ ✓ Compiled / in 1497ms (628 modules)
+ GET / 200 in 1749ms
+ ✓ Compiled in 274ms (614 modules)
+ ✓ Compiled in 199ms (614 modules)

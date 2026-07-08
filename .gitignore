@@ -1,0 +1,17 @@
+node_modules
+.DS_Store
+.env
+.env.local
+.next
+dist
+coverage
+.turbo
+apps/backend/generated
+apps/backend/prisma/dev.db
+apps/backend/prisma/dev.db-journal
+apps/flutter_app/.dart_tool
+apps/flutter_app/.flutter-plugins
+apps/flutter_app/.flutter-plugins-dependencies
+apps/flutter_app/.packages
+apps/flutter_app/build
+apps/flutter_app/ios/Pods

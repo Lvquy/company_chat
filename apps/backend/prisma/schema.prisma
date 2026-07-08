@@ -1,0 +1,189 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserStatus {
+  ACTIVE
+  INACTIVE
+}
+
+enum ConversationType {
+  DIRECT
+  GROUP
+}
+
+enum ConversationRole {
+  OWNER
+  ADMIN
+  MEMBER
+}
+
+enum MessageType {
+  TEXT
+  IMAGE
+  FILE
+  MIXED
+  SYSTEM
+}
+
+model Department {
+  id          String             @id @default(cuid())
+  name        String             @unique
+  code        String             @unique
+  description String?
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+  members     DepartmentMember[]
+}
+
+model User {
+  id               String               @id @default(cuid())
+  username         String               @unique
+  email            String?              @unique
+  fullName         String
+  passwordHash     String
+  avatarUrl        String?
+  status           UserStatus           @default(ACTIVE)
+  createdAt        DateTime             @default(now())
+  updatedAt        DateTime             @updatedAt
+  departments      DepartmentMember[]
+  conversationRefs ConversationMember[]
+  messages         Message[]
+  attachments      Attachment[]
+  reads            MessageRead[]
+  reactions        MessageReaction[]
+  loginActivities  LoginActivity[]
+  attendanceLogs   AttendanceRecord[]
+}
+
+model DepartmentMember {
+  id           String     @id @default(cuid())
+  departmentId String
+  userId       String
+  title        String?
+  createdAt    DateTime   @default(now())
+  department   Department @relation(fields: [departmentId], references: [id], onDelete: Cascade)
+  user         User       @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([departmentId, userId])
+}
+
+model Conversation {
+  id             String               @id @default(cuid())
+  type           ConversationType
+  title          String?
+  createdById    String
+  createdAt      DateTime             @default(now())
+  updatedAt      DateTime             @updatedAt
+  lastMessageAt  DateTime?
+  members        ConversationMember[]
+  messages       Message[]
+}
+
+model ConversationMember {
+  id             String           @id @default(cuid())
+  conversationId String
+  userId         String
+  role           ConversationRole @default(MEMBER)
+  joinedAt       DateTime         @default(now())
+  conversation   Conversation     @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  user           User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([conversationId, userId])
+}
+
+model Message {
+  id             String                @id @default(cuid())
+  conversationId String
+  senderId       String
+  replyToId      String?
+  type           MessageType           @default(TEXT)
+  body           String?
+  createdAt      DateTime              @default(now())
+  updatedAt      DateTime              @updatedAt
+  deletedAt      DateTime?
+  conversation   Conversation          @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  sender         User                  @relation(fields: [senderId], references: [id], onDelete: Restrict)
+  replyTo        Message?              @relation("MessageReplies", fields: [replyToId], references: [id], onDelete: SetNull)
+  replies        Message[]             @relation("MessageReplies")
+  reads          MessageRead[]
+  attachments    MessageAttachment[]
+  reactions      MessageReaction[]
+}
+
+model MessageReaction {
+  id        String   @id @default(cuid())
+  messageId String
+  userId    String
+  emoji     String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  message   Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId, emoji])
+}
+
+model MessageRead {
+  id         String   @id @default(cuid())
+  messageId  String
+  userId     String
+  readAt     DateTime @default(now())
+  message    Message  @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, userId])
+}
+
+model Attachment {
+  id           String              @id @default(cuid())
+  originalName String
+  mimeType     String
+  size         Int
+  storageKey   String              @unique
+  uploadedById String
+  createdAt    DateTime            @default(now())
+  uploadedBy   User                @relation(fields: [uploadedById], references: [id], onDelete: Restrict)
+  links        MessageAttachment[]
+}
+
+model MessageAttachment {
+  id           String     @id @default(cuid())
+  messageId    String
+  attachmentId String
+  message      Message    @relation(fields: [messageId], references: [id], onDelete: Cascade)
+  attachment   Attachment @relation(fields: [attachmentId], references: [id], onDelete: Cascade)
+
+  @@unique([messageId, attachmentId])
+}
+
+model LoginActivity {
+  id         String   @id @default(cuid())
+  userId     String
+  ipAddress  String?
+  userAgent  String?
+  loggedInAt DateTime @default(now())
+  user       User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model AttendanceRecord {
+  id               String   @id @default(cuid())
+  userId           String
+  workDate         String
+  checkInAt        DateTime
+  checkOutAt       DateTime?
+  checkInIp        String?
+  checkOutIp       String?
+  checkInUserAgent String?
+  checkOutUserAgent String?
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+  user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workDate])
+}

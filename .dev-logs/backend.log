@@ -1,0 +1,55 @@
+$ pnpm --filter backend dev
+$ nest start --watch
+[2J[3J[H[[90m10:39:36 PM[0m] Starting compilation in watch mode...
+
+[[90m10:39:36 PM[0m] Found 0 errors. Watching for file changes.
+
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[NestFactory] [39m[32mStarting Nest application...[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigHostModule dependencies initialized[39m[38;5;3m +28ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mConfigModule dependencies initialized[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[InstanceLoader] [39m[32mAppModule dependencies initialized[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[WebSocketsController] [39m[32mChatGateway subscribed to the "conversation:join" message[39m[38;5;3m +17ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[WebSocketsController] [39m[32mChatGateway subscribed to the "message:send" message[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAppController {/}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/health, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAdminController {/admin}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/overview, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/login-activities, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/admin/attendance, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAuthController {/auth}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/login, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/me, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/change-password, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/profile, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/auth/logout, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAttendanceController {/attendance}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/attendance/check-in, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/attendance/check-out, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/attendance/me, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mSetupController {/setup}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/setup/status, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mUsersController {/users}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users, GET} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users/directory, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/users/:id/reset-password, POST} route[39m[38;5;3m +1ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mDepartmentsController {/departments}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/departments, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/departments, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/departments/:id, PATCH} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/departments/:id, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mConversationsController {/conversations}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/direct, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/messages, GET} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/messages, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/messages/:messageId/reactions, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId/members, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId/members/:memberId, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/conversations/:conversationId, DELETE} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RoutesResolver] [39m[32mAttachmentsController {/attachments}:[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[RouterExplorer] [39m[32mMapped {/attachments, POST} route[39m[38;5;3m +0ms[39m
+[32m[Nest] 27221  - [39m07/08/2026, 10:39:37 PM [32m    LOG[39m [38;5;3m[NestApplication] [39m[32mNest application successfully started[39m[38;5;3m +40ms[39m

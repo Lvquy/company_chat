@@ -1,0 +1,38 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: inhouse-chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: inhouse_chat
+      POSTGRES_USER: chat_admin
+      POSTGRES_PASSWORD: chat_secret
+    ports:
+      - "5435:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: inhouse-chat-redis
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+
+  minio:
+    image: minio/minio:latest
+    container_name: inhouse-chat-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: minioadmin
+      MINIO_ROOT_PASSWORD: minioadmin
+    command: server /data --console-address ":9001"
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio_data:/data
+
+volumes:
+  postgres_data:
+  minio_data:

@@ -1,0 +1,80 @@
+services:
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: inhouse-chat-nginx
+    restart: unless-stopped
+    depends_on:
+      - admin
+      - backend
+    ports:
+      - "80:80"
+    volumes:
+      - ./deploy/nginx.conf:/etc/nginx/conf.d/default.conf:ro
+
+  admin:
+    build:
+      context: .
+      dockerfile: apps/admin/Dockerfile
+      args:
+        NEXT_PUBLIC_API_BASE: ${NEXT_PUBLIC_API_BASE:-/api}
+        NEXT_PUBLIC_SOCKET_BASE: ${NEXT_PUBLIC_SOCKET_BASE-}
+    container_name: inhouse-chat-admin
+    restart: unless-stopped
+
+  backend:
+    build:
+      context: .
+      dockerfile: apps/backend/Dockerfile
+    container_name: inhouse-chat-backend
+    restart: unless-stopped
+    depends_on:
+      - postgres
+      - redis
+      - minio
+    environment:
+      DATABASE_URL: postgresql://${POSTGRES_USER:-chat_admin}:${POSTGRES_PASSWORD:-chat_secret}@postgres:5432/${POSTGRES_DB:-inhouse_chat}?schema=public
+      REDIS_URL: redis://redis:6379
+      MINIO_ENDPOINT: minio
+      MINIO_PORT: 9000
+      MINIO_USE_SSL: "false"
+      MINIO_ACCESS_KEY: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_SECRET_KEY: ${MINIO_ROOT_PASSWORD:-minioadmin}
+      MINIO_BUCKET: ${MINIO_BUCKET:-chat-attachments}
+      JWT_ACCESS_SECRET: ${JWT_ACCESS_SECRET}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET}
+      APP_PORT: 3001
+      APP_ORIGIN: ${APP_ORIGIN:-http://localhost}
+
+  postgres:
+    image: postgres:16
+    container_name: inhouse-chat-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-inhouse_chat}
+      POSTGRES_USER: ${POSTGRES_USER:-chat_admin}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-chat_secret}
+    volumes:
+      - postgres_prod_data:/var/lib/postgresql/data
+
+  redis:
+    image: redis:7
+    container_name: inhouse-chat-redis
+    restart: unless-stopped
+    volumes:
+      - redis_prod_data:/data
+
+  minio:
+    image: minio/minio:latest
+    container_name: inhouse-chat-minio
+    restart: unless-stopped
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minioadmin}
+    command: server /data --console-address ":9001"
+    volumes:
+      - minio_prod_data:/data
+
+volumes:
+  postgres_prod_data:
+  redis_prod_data:
+  minio_prod_data:
