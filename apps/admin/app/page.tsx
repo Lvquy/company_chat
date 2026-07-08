@@ -20,6 +20,20 @@ const MUTED_CONVERSATIONS_KEY = 'inhouse-chat-muted-conversations';
 const EMOJIS = ['👍', '😀', '😂', '❤️', '🎉', '🔥'];
 const REACTION_PICKER_OPEN_DELAY_MS = 1000;
 
+type DesktopConfig = {
+  serverUrl: string;
+  companyName: string;
+  logoDataUrl: string;
+};
+
+declare global {
+  interface Window {
+    desktopApp?: {
+      getConfig: () => Promise<DesktopConfig>;
+    };
+  }
+}
+
 type Department = {
   id: string;
   name: string;
@@ -701,10 +715,15 @@ export default function HomePage() {
   const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUser | null>(null);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [groupMemberSelection, setGroupMemberSelection] = useState<string[]>([]);
+  const [desktopBranding, setDesktopBranding] = useState<DesktopConfig>({
+    serverUrl: '',
+    companyName: 'Company Chat',
+    logoDataUrl: '',
+  });
 
   const [loginForm, setLoginForm] = useState({
-    username: 'admin',
-    password: 'admin123',
+    username: '',
+    password: '',
   });
   const [messageBody, setMessageBody] = useState('');
   const [groupForm, setGroupForm] = useState({
@@ -731,6 +750,23 @@ export default function HomePage() {
     fullName: '',
     avatarUrl: '',
   });
+
+  useEffect(() => {
+    if (!window.desktopApp?.getConfig) {
+      return;
+    }
+
+    window.desktopApp
+      .getConfig()
+      .then((config) => {
+        setDesktopBranding({
+          serverUrl: config.serverUrl || '',
+          companyName: config.companyName || 'Company Chat',
+          logoDataUrl: config.logoDataUrl || '',
+        });
+      })
+      .catch(() => undefined);
+  }, []);
 
   useEffect(() => {
     const storedToken = window.localStorage.getItem(TOKEN_KEY);
@@ -980,8 +1016,9 @@ export default function HomePage() {
 
   useEffect(() => {
     const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
-    document.title = totalUnread > 0 ? `(${totalUnread}) Company Chat` : 'Company Chat';
-  }, [unreadCounts]);
+    const appTitle = desktopBranding.companyName || 'Company Chat';
+    document.title = totalUnread > 0 ? `(${totalUnread}) ${appTitle}` : appTitle;
+  }, [desktopBranding.companyName, unreadCounts]);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedConversationId) ?? null,
@@ -1799,10 +1836,21 @@ export default function HomePage() {
         <div className="login-shell">
           <section className="login-card">
             <div className="login-brand">
-              <div className="brand-mark">C</div>
+              {desktopBranding.logoDataUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  alt={desktopBranding.companyName}
+                  className="brand-mark brand-mark-image"
+                  src={desktopBranding.logoDataUrl}
+                />
+              ) : (
+                <div className="brand-mark">
+                  {getInitials(desktopBranding.companyName || 'Company Chat').slice(0, 1)}
+                </div>
+              )}
               <div>
-                <strong>Company Chat</strong>
-                <span>Internal communication</span>
+                <strong>{desktopBranding.companyName || 'Company Chat'}</strong>
+                <span>Trao đổi nội bộ</span>
               </div>
             </div>
             <form className="stack" onSubmit={handleLogin}>
@@ -1821,9 +1869,6 @@ export default function HomePage() {
                 {busy === 'login' ? 'Đang đăng nhập...' : 'Đăng nhập'}
               </button>
             </form>
-            <div className="login-hint">
-              Tài khoản mẫu: <code>admin / admin123</code>
-            </div>
             {error ? <p className="error-banner">{error}</p> : null}
           </section>
         </div>

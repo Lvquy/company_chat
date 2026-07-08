@@ -3,7 +3,7 @@ const fs = require("fs");
 const path = require("path");
 
 const DEFAULT_SERVER_URL =
-  process.env.DESKTOP_DEFAULT_SERVER_URL || "http://localhost";
+  process.env.DESKTOP_DEFAULT_SERVER_URL || "http://localhost:3000";
 
 let mainWindow = null;
 
@@ -22,6 +22,14 @@ function normalizeServerUrl(value) {
     if (url.protocol !== "http:" && url.protocol !== "https:") {
       return "";
     }
+
+    if (
+      !url.port &&
+      (url.hostname === "localhost" || url.hostname === "127.0.0.1")
+    ) {
+      url.port = "3000";
+    }
+
     return url.toString().replace(/\/+$/, "");
   } catch {
     return "";
@@ -31,16 +39,26 @@ function normalizeServerUrl(value) {
 function readConfig() {
   const configPath = getConfigPath();
   if (!fs.existsSync(configPath)) {
-    return { serverUrl: DEFAULT_SERVER_URL };
+    return {
+      serverUrl: DEFAULT_SERVER_URL,
+      companyName: "Company Chat",
+      logoDataUrl: "",
+    };
   }
 
   try {
     const data = JSON.parse(fs.readFileSync(configPath, "utf8"));
     return {
       serverUrl: normalizeServerUrl(data.serverUrl) || DEFAULT_SERVER_URL,
+      companyName: String(data.companyName || "Company Chat").trim() || "Company Chat",
+      logoDataUrl: typeof data.logoDataUrl === "string" ? data.logoDataUrl : "",
     };
   } catch {
-    return { serverUrl: DEFAULT_SERVER_URL };
+    return {
+      serverUrl: DEFAULT_SERVER_URL,
+      companyName: "Company Chat",
+      logoDataUrl: "",
+    };
   }
 }
 
@@ -54,7 +72,7 @@ function getServerUrl() {
   return readConfig().serverUrl || DEFAULT_SERVER_URL;
 }
 
-function loadConfigScreen(errorMessage = "") {
+function loadConfigScreen(errorMessage = "", section = "server") {
   if (!mainWindow) {
     return;
   }
@@ -63,6 +81,9 @@ function loadConfigScreen(errorMessage = "") {
   const query = {};
   if (errorMessage) {
     query.error = errorMessage;
+  }
+  if (section) {
+    query.section = section;
   }
   mainWindow.loadFile(filePath, { query });
 }
@@ -73,7 +94,9 @@ async function loadChatApp() {
   try {
     await mainWindow.loadURL(serverUrl);
   } catch {
-    loadConfigScreen("Khong ket noi duoc toi server. Kiem tra lai SERVER_BASE_URL.");
+    loadConfigScreen(
+      "Không kết nối được tới server. Nếu đang chạy local, hãy dùng http://localhost:3000.",
+    );
   }
 }
 
@@ -108,14 +131,27 @@ function createMainWindow() {
 function createAppMenu() {
   const template = [
     {
-      label: "Company Chat",
+      label: "Cấu hình",
       submenu: [
         {
-          label: "Cau hinh server",
-          click: () => loadConfigScreen(),
+          label: "Cấu hình",
+          submenu: [
+            {
+              label: "URL server",
+              click: () => loadConfigScreen("", "server"),
+            },
+            {
+              label: "Tên công ty",
+              click: () => loadConfigScreen("", "branding"),
+            },
+            {
+              label: "Logo công ty",
+              click: () => loadConfigScreen("", "branding"),
+            },
+          ],
         },
         {
-          label: "Tai lai",
+          label: "Tải lại",
           accelerator: "CmdOrCtrl+R",
           click: () => {
             if (mainWindow) {
@@ -124,7 +160,7 @@ function createAppMenu() {
           },
         },
         {
-          label: "Mo DevTools",
+          label: "Mở DevTools",
           accelerator: "Alt+CmdOrCtrl+I",
           click: () => {
             if (mainWindow) {
@@ -133,7 +169,7 @@ function createAppMenu() {
           },
         },
         { type: "separator" },
-        { role: "quit", label: "Thoat" },
+        { role: "quit", label: "Thoát" },
       ],
     },
   ];
@@ -167,10 +203,18 @@ ipcMain.handle("desktop:get-config", () => {
 ipcMain.handle("desktop:save-config", async (_event, payload) => {
   const serverUrl = normalizeServerUrl(payload?.serverUrl);
   if (!serverUrl) {
-    return { ok: false, message: "Server URL khong hop le. Vi du: https://chat.company.vn" };
+    return {
+      ok: false,
+      message: "Server URL không hợp lệ. Ví dụ: https://chat.company.vn hoặc http://localhost:3000",
+    };
   }
 
-  writeConfig({ serverUrl });
+  writeConfig({
+    serverUrl,
+    companyName:
+      String(payload?.companyName || "").trim() || "Company Chat",
+    logoDataUrl: typeof payload?.logoDataUrl === "string" ? payload.logoDataUrl : "",
+  });
   await loadChatApp();
   return { ok: true };
 });
@@ -180,13 +224,35 @@ ipcMain.handle("desktop:reload-chat", async () => {
   return { ok: true };
 });
 
-ipcMain.handle("desktop:show-server-example", async () => {
-  await dialog.showMessageBox({
-    type: "info",
-    title: "Vi du server URL",
-    message: "Nhap URL server self-host cua anh, vi du:\nhttps://chat.company.vn\nhoac http://192.168.1.10",
+ipcMain.handle("desktop:pick-logo", async () => {
+  const result = await dialog.showOpenDialog({
+    title: "Chọn logo công ty",
+    properties: ["openFile"],
+    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "svg"] }],
   });
-  return { ok: true };
+
+  if (result.canceled || result.filePaths.length === 0) {
+    return { ok: false };
+  }
+
+  const filePath = result.filePaths[0];
+  const ext = path.extname(filePath).toLowerCase();
+  const mimeType =
+    ext === ".png"
+      ? "image/png"
+      : ext === ".jpg" || ext === ".jpeg"
+        ? "image/jpeg"
+        : ext === ".webp"
+          ? "image/webp"
+          : ext === ".svg"
+            ? "image/svg+xml"
+            : "application/octet-stream";
+
+  const fileBuffer = fs.readFileSync(filePath);
+  return {
+    ok: true,
+    dataUrl: `data:${mimeType};base64,${fileBuffer.toString("base64")}`,
+  };
 });
 
 app.on("window-all-closed", () => {

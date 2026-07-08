@@ -3,7 +3,7 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width,initial-scale=1" />
-    <title>Company Chat Desktop Config</title>
+    <title>Cấu hình Company Chat Desktop</title>
     <style>
       :root {
         color-scheme: dark;
@@ -31,12 +31,47 @@
       }
 
       .panel {
-        width: min(520px, calc(100vw - 40px));
+        width: min(760px, calc(100vw - 40px));
         border: 1px solid var(--line);
         border-radius: 28px;
         background: rgba(32, 37, 47, 0.96);
         padding: 32px;
         box-shadow: 0 30px 60px rgba(0, 0, 0, 0.35);
+      }
+
+      .layout {
+        display: grid;
+        grid-template-columns: 180px minmax(0, 1fr);
+        gap: 24px;
+        margin-top: 28px;
+      }
+
+      .section-nav {
+        display: flex;
+        flex-direction: column;
+        gap: 10px;
+      }
+
+      .section-tab {
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background: #1a2029;
+        color: #e8eefc;
+        text-align: left;
+        padding: 14px 16px;
+      }
+
+      .section-tab.active {
+        background: rgba(76, 130, 255, 0.18);
+        border-color: rgba(76, 130, 255, 0.45);
+      }
+
+      .config-section {
+        display: none;
+      }
+
+      .config-section.active {
+        display: block;
       }
 
       h1 {
@@ -52,7 +87,7 @@
       }
 
       .field {
-        margin-top: 24px;
+        margin-top: 20px;
       }
 
       label {
@@ -99,7 +134,7 @@
 
       .actions {
         display: flex;
-        gap: 12px;
+        justify-content: flex-end;
         margin-top: 24px;
       }
 
@@ -113,56 +148,146 @@
       }
 
       .primary {
-        flex: 1;
         color: #fff;
         background: var(--primary);
+        min-width: 220px;
       }
 
-      .secondary {
+      .logo-preview {
+        width: 96px;
+        height: 96px;
+        border-radius: 24px;
+        border: 1px solid var(--line);
+        background: #151a22;
+        display: grid;
+        place-items: center;
+        overflow: hidden;
+        margin-bottom: 14px;
+      }
+
+      .logo-preview img {
+        width: 100%;
+        height: 100%;
+        object-fit: cover;
+      }
+
+      .logo-fallback {
+        font-size: 36px;
+        font-weight: 800;
+        color: #dce6ff;
+      }
+
+      .ghost {
         color: #dfe7ff;
         background: #2b3240;
+        margin-right: 12px;
+      }
+
+      @media (max-width: 780px) {
+        .layout {
+          grid-template-columns: 1fr;
+        }
       }
     </style>
   </head>
   <body>
     <main class="panel">
-      <h1>Ket noi server</h1>
+      <h1>Cấu hình ứng dụng</h1>
       <p>
-        Desktop app nay se mo chat qua server self-host cua anh. Nhap domain hoac IP de
-        app map ve dung host noi bo.
+        Cấu hình một lần cho từng công ty: URL server, tên hiển thị và logo ở màn đăng nhập.
       </p>
 
-      <div class="field">
-        <label for="serverUrl">SERVER_BASE_URL</label>
-        <input id="serverUrl" type="text" placeholder="https://chat.company.vn" />
-        <div class="hint">Vi du: https://chat.company.vn hoac http://192.168.1.10</div>
+      <div class="layout">
+        <div class="section-nav">
+          <button id="serverTab" class="section-tab active" type="button">URL server</button>
+          <button id="brandingTab" class="section-tab" type="button">Thương hiệu</button>
+        </div>
+
+        <div>
+          <section id="serverSection" class="config-section active">
+            <div class="field" style="margin-top: 0">
+              <label for="serverUrl">SERVER_BASE_URL</label>
+              <input id="serverUrl" type="text" placeholder="https://chat.company.vn" />
+              <div class="hint">
+                Ví dụ: https://chat.company.vn hoặc http://192.168.1.10 hoặc
+                http://localhost:3000
+              </div>
+            </div>
+          </section>
+
+          <section id="brandingSection" class="config-section">
+            <div class="field" style="margin-top: 0">
+              <label for="companyName">Tên công ty / tên ứng dụng</label>
+              <input id="companyName" type="text" placeholder="Công ty ABC" />
+            </div>
+
+            <div class="field">
+              <label>Logo công ty</label>
+              <div id="logoPreview" class="logo-preview">
+                <div id="logoFallback" class="logo-fallback">C</div>
+                <img id="logoImage" alt="Logo công ty" hidden />
+              </div>
+              <button id="pickLogoButton" class="ghost" type="button">Chọn logo</button>
+            </div>
+          </section>
+        </div>
       </div>
 
       <div id="errorBox" class="error"></div>
 
       <div class="actions">
-        <button id="exampleButton" class="secondary" type="button">Vi du</button>
-        <button id="saveButton" class="primary" type="button">Luu va mo app</button>
+        <button id="saveButton" class="primary" type="button">Lưu và mở app</button>
       </div>
     </main>
 
     <script>
       const input = document.getElementById("serverUrl");
+      const companyNameInput = document.getElementById("companyName");
       const saveButton = document.getElementById("saveButton");
-      const exampleButton = document.getElementById("exampleButton");
+      const pickLogoButton = document.getElementById("pickLogoButton");
       const errorBox = document.getElementById("errorBox");
+      const logoImage = document.getElementById("logoImage");
+      const logoFallback = document.getElementById("logoFallback");
+      const serverTab = document.getElementById("serverTab");
+      const brandingTab = document.getElementById("brandingTab");
+      const serverSection = document.getElementById("serverSection");
+      const brandingSection = document.getElementById("brandingSection");
+      let logoDataUrl = "";
 
       function setError(message) {
         errorBox.textContent = message || "";
         errorBox.classList.toggle("show", Boolean(message));
       }
 
+      function renderLogo() {
+        const fallbackValue = (companyNameInput.value || "C").trim().charAt(0).toUpperCase() || "C";
+        logoFallback.textContent = fallbackValue;
+        logoFallback.hidden = Boolean(logoDataUrl);
+        logoImage.hidden = !logoDataUrl;
+        if (logoDataUrl) {
+          logoImage.src = logoDataUrl;
+        }
+      }
+
+      function setSection(section) {
+        const isBranding = section === "branding";
+        serverTab.classList.toggle("active", !isBranding);
+        brandingTab.classList.toggle("active", isBranding);
+        serverSection.classList.toggle("active", !isBranding);
+        brandingSection.classList.toggle("active", isBranding);
+      }
+
       async function bootstrap() {
         const config = await window.desktopApp.getConfig();
         input.value = config.serverUrl || "";
+        companyNameInput.value = config.companyName || "Company Chat";
+        logoDataUrl = config.logoDataUrl || "";
+        renderLogo();
 
         const params = new URLSearchParams(window.location.search);
         const error = params.get("error");
+        const section = params.get("section") || "server";
+        setSection(section);
         if (error) {
           setError(error);
         }
@@ -170,14 +295,26 @@
 
       saveButton.addEventListener("click", async () => {
         setError("");
-        const response = await window.desktopApp.saveConfig({ serverUrl: input.value });
+        const response = await window.desktopApp.saveConfig({
+          serverUrl: input.value,
+          companyName: companyNameInput.value,
+          logoDataUrl,
+        });
         if (!response.ok) {
           setError(response.message);
         }
       });
 
-      exampleButton.addEventListener("click", async () => {
-        await window.desktopApp.showServerExample();
+      serverTab.addEventListener("click", () => setSection("server"));
+      brandingTab.addEventListener("click", () => setSection("branding"));
+      companyNameInput.addEventListener("input", renderLogo);
+
+      pickLogoButton.addEventListener("click", async () => {
+        const result = await window.desktopApp.pickLogo();
+        if (result?.ok && result.dataUrl) {
+          logoDataUrl = result.dataUrl;
+          renderLogo();
+        }
       });
 
       bootstrap();
