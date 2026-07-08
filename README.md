@@ -105,6 +105,11 @@ Stack production gồm:
 - `redis`
 - `minio`
 
+MinIO hiện được publish ra host để có thể kiểm tra trực tiếp:
+
+- API/storage: `http://IP_SERVER:9000`
+- Console quản trị: `http://IP_SERVER:9001`
+
 ### 3. Chạy migration DB
 
 ```bash
@@ -129,6 +134,8 @@ Ví dụ:
 
 - Web: `https://chat.example.com`
 - API: `https://chat.example.com/api`
+- MinIO API: `http://IP_SERVER:9000`
+- MinIO Console: `http://IP_SERVER:9001`
 
 ## Desktop App Và Mobile App
 

@@ -73,6 +73,9 @@ services:
     command: server /data --console-address ":9001"
     volumes:
       - minio_prod_data:/data
+    ports:
+      - "9000:9000"
+      - "9001:9001"
 
 volumes:
   postgres_prod_data:
