@@ -23,7 +23,6 @@ async function main() {
       data: {
         username: 'admin',
         fullName: 'System Admin',
-        email: 'admin@company.local',
         passwordHash: createHash('sha256').update('admin123').digest('hex'),
         departments: {
           create: [{ departmentId: department.id }],

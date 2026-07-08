@@ -22,7 +22,6 @@ export class AuthService {
       select: {
         id: true,
         username: true,
-        email: true,
         fullName: true,
         avatarUrl: true,
         status: true,
@@ -63,7 +62,6 @@ export class AuthService {
       user: {
         id: user.id,
         username: user.username,
-        email: user.email,
         fullName: user.fullName,
         avatarUrl: user.avatarUrl,
         status: user.status,
@@ -87,7 +85,6 @@ export class AuthService {
       select: {
         id: true,
         username: true,
-        email: true,
         fullName: true,
         avatarUrl: true,
         status: true,

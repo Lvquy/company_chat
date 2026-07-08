@@ -49,7 +49,6 @@ type Department = {
     user: {
       id: string;
       username: string;
-      email?: string | null;
       fullName: string;
       avatarUrl?: string | null;
       status: string;
@@ -60,7 +59,6 @@ type Department = {
 type User = {
   id: string;
   username: string;
-  email?: string | null;
   fullName: string;
   avatarUrl?: string | null;
   status: string;
@@ -71,7 +69,6 @@ type User = {
 type DirectoryUser = {
   id: string;
   username: string;
-  email?: string | null;
   fullName: string;
   avatarUrl?: string | null;
   status: string;
@@ -157,7 +154,6 @@ type IncomingToast = {
 type AdminUser = {
   id: string;
   username: string;
-  email?: string | null;
   fullName: string;
   avatarUrl?: string | null;
   status: 'ACTIVE' | 'INACTIVE';
@@ -736,7 +732,6 @@ export default function HomePage() {
   const [userForm, setUserForm] = useState({
     username: '',
     fullName: '',
-    email: '',
     avatarUrl: '',
     password: '',
     status: 'ACTIVE' as 'ACTIVE' | 'INACTIVE',
@@ -1715,7 +1710,6 @@ export default function HomePage() {
     setUserForm({
       username: '',
       fullName: '',
-      email: '',
       avatarUrl: '',
       password: '',
       status: 'ACTIVE',
@@ -1754,7 +1748,6 @@ export default function HomePage() {
     setUserForm({
       username: user.username,
       fullName: user.fullName,
-      email: user.email ?? '',
       avatarUrl: user.avatarUrl ?? '',
       password: '',
       status: user.status,

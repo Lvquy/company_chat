@@ -5,7 +5,6 @@ import { PrismaService } from './prisma.service';
 
 type CreateUserInput = {
   username: string;
-  email?: string;
   fullName: string;
   avatarUrl?: string;
   password: string;
@@ -15,7 +14,6 @@ type CreateUserInput = {
 
 type UpdateUserInput = {
   username?: string;
-  email?: string;
   fullName?: string;
   avatarUrl?: string;
   password?: string;
@@ -30,7 +28,6 @@ export class UsersService {
   private adminUserSelect = {
     id: true,
     username: true,
-    email: true,
     fullName: true,
     avatarUrl: true,
     status: true,
@@ -89,7 +86,6 @@ export class UsersService {
       select: {
         id: true,
         username: true,
-        email: true,
         fullName: true,
         avatarUrl: true,
         status: true,
@@ -103,18 +99,13 @@ export class UsersService {
   }
 
   async create(input: CreateUserInput) {
-    const clauses: Prisma.UserWhereInput[] = [{ username: input.username }];
-    if (input.email) {
-      clauses.push({ email: input.email });
-    }
-
     const existing = await this.prisma.user.findFirst({
       where: {
-        OR: clauses,
+        username: input.username,
       },
     });
     if (existing) {
-      throw new BadRequestException('Username or email already exists');
+      throw new BadRequestException('Username already exists');
     }
 
     const passwordHash = createHash('sha256').update(input.password).digest('hex');
@@ -122,7 +113,6 @@ export class UsersService {
     const user = await this.prisma.user.create({
       data: {
         username: input.username,
-        email: input.email,
         fullName: input.fullName,
         avatarUrl: input.avatarUrl || null,
         status: input.status ?? 'ACTIVE',
@@ -150,7 +140,6 @@ export class UsersService {
       select: {
         id: true,
         username: true,
-        email: true,
       },
     });
 
@@ -162,21 +151,15 @@ export class UsersService {
       throw new BadRequestException('This user cannot be edited');
     }
 
-    if (input.username || input.email) {
-      const clauses: Prisma.UserWhereInput[] = [];
-      if (input.username) clauses.push({ username: input.username });
-      if (input.email) clauses.push({ email: input.email });
-
-      if (clauses.length) {
-        const existing = await this.prisma.user.findFirst({
-          where: {
-            id: { not: id },
-            OR: clauses,
-          },
-        });
-        if (existing) {
-          throw new BadRequestException('Username or email already exists');
-        }
+    if (input.username) {
+      const existing = await this.prisma.user.findFirst({
+        where: {
+          id: { not: id },
+          username: input.username,
+        },
+      });
+      if (existing) {
+        throw new BadRequestException('Username already exists');
       }
     }
 
@@ -188,7 +171,6 @@ export class UsersService {
       where: { id },
       data: {
         username: input.username ?? undefined,
-        email: input.email === undefined ? undefined : input.email || null,
         fullName: input.fullName ?? undefined,
         avatarUrl: input.avatarUrl === undefined ? undefined : input.avatarUrl || null,
         status: input.status ?? undefined,

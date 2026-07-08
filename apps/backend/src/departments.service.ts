@@ -61,7 +61,6 @@ export class DepartmentsService {
               select: {
                 id: true,
                 username: true,
-                email: true,
                 fullName: true,
                 avatarUrl: true,
                 status: true,
@@ -131,7 +130,6 @@ export class DepartmentsService {
               select: {
                 id: true,
                 username: true,
-                email: true,
                 fullName: true,
                 avatarUrl: true,
                 status: true,

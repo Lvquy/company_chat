@@ -1,0 +1,2 @@
+DROP INDEX IF EXISTS "User_email_key";
+ALTER TABLE "User" DROP COLUMN IF EXISTS "email";

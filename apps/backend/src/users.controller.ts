@@ -3,17 +3,13 @@ import { AdminGuard } from './admin.guard';
 import { AuthGuard } from './auth.guard';
 import { CurrentUser } from './current-user.decorator';
 import { AuthUser } from './auth.types';
-import { IsArray, IsEmail, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
+import { IsArray, IsIn, IsOptional, IsString, MinLength } from 'class-validator';
 import { UsersService } from './users.service';
 
 class CreateUserDto {
   @IsString()
   @MinLength(3)
   username!: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 
   @IsString()
   @MinLength(2)
@@ -41,10 +37,6 @@ class UpdateUserDto {
   @IsString()
   @MinLength(3)
   username?: string;
-
-  @IsOptional()
-  @IsEmail()
-  email?: string;
 
   @IsOptional()
   @IsString()
