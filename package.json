@@ -6,8 +6,12 @@
   "scripts": {
     "dev:backend": "pnpm --filter backend dev",
     "dev:admin": "pnpm --filter admin dev",
+    "dev:desktop": "pnpm --filter desktop dev",
     "reload:dev": "bash ./scripts/reload-dev.sh",
     "build": "pnpm -r build",
+    "build:desktop": "pnpm --filter desktop build",
+    "build:desktop:mac": "pnpm --filter desktop build:mac",
+    "build:desktop:win": "pnpm --filter desktop build:win",
     "lint": "pnpm -r lint",
     "format": "pnpm -r format",
     "db:generate": "pnpm --filter backend prisma generate",

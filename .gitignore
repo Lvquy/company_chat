@@ -2,10 +2,13 @@ node_modules
 .DS_Store
 .env
 .env.local
+.dev-logs
 .next
 dist
 coverage
 .turbo
+*.log
+*.pid
 apps/backend/generated
 apps/backend/prisma/dev.db
 apps/backend/prisma/dev.db-journal

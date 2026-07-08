@@ -152,3 +152,49 @@ Với web hiện tại tôi đã đổi sang env:
 - `NEXT_PUBLIC_SOCKET_BASE`
 
 Nên khi self-host chỉ cần map đúng host của anh là chạy được.
+
+## Electron Desktop App
+
+App desktop Electron đã được tách riêng trong repo tại `apps/desktop`.
+
+### Chạy desktop app ở máy dev
+
+```bash
+pnpm install
+pnpm dev:desktop
+```
+
+Lần đầu mở app, nhập `SERVER_BASE_URL` của hệ thống self-host, ví dụ:
+
+- `https://chat.example.com`
+- `http://192.168.1.10`
+
+### Build macOS `.dmg`
+
+```bash
+pnpm build:desktop:mac
+```
+
+### Build Windows `.exe`
+
+```bash
+pnpm build:desktop:win
+```
+
+### Build cả desktop targets
+
+```bash
+pnpm build:desktop
+```
+
+File output sẽ nằm trong:
+
+```bash
+apps/desktop/dist
+```
+
+Lưu ý:
+
+- `.dmg` build trên macOS là chuẩn nhất
+- `.exe` nên build trên Windows để tránh lỗi toolchain
+- desktop app không cần API key riêng, chỉ cần cấu hình `SERVER_BASE_URL`
