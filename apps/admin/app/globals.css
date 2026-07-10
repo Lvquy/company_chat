@@ -287,6 +287,10 @@ button:disabled {
   justify-items: center;
 }
 
+.settings-menu-anchor {
+  position: relative;
+}
+
 .rail-button,
 .avatar-rail-button,
 .icon-button {
@@ -324,6 +328,90 @@ button:disabled {
 .icon-button svg {
   width: 20px;
   height: 20px;
+}
+
+.settings-popover {
+  position: absolute;
+  left: calc(100% + 14px);
+  bottom: -8px;
+  width: 280px;
+  padding: 14px;
+  border-radius: 22px;
+  background: rgba(36, 40, 47, 0.98);
+  border: 1px solid #3b414c;
+  box-shadow: 0 28px 60px rgba(0, 0, 0, 0.38);
+  display: grid;
+  gap: 12px;
+  z-index: 40;
+}
+
+.settings-popover-profile {
+  width: 100%;
+  background: transparent;
+  padding: 0;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  color: #f4f7ff;
+  text-align: left;
+}
+
+.settings-popover-profile-copy {
+  display: grid;
+  gap: 2px;
+}
+
+.settings-popover-profile-copy strong {
+  font-size: 18px;
+}
+
+.settings-popover-profile-copy small {
+  color: var(--muted);
+  font-size: 13px;
+}
+
+.settings-popover-section {
+  display: grid;
+  gap: 4px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.settings-popover-section:first-of-type {
+  padding-top: 0;
+  border-top: 0;
+}
+
+.settings-popover-item {
+  width: 100%;
+  min-height: 46px;
+  background: transparent;
+  border-radius: 14px;
+  padding: 0 10px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  justify-content: flex-start;
+  color: #f2f5fc;
+}
+
+.settings-popover-item:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+
+.settings-popover-item svg {
+  width: 20px;
+  height: 20px;
+  flex: none;
+}
+
+.settings-popover-item span {
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.settings-popover-item-danger {
+  color: #ff8181;
 }
 
 .avatar {
@@ -1558,10 +1646,15 @@ button:disabled {
   margin-bottom: 16px;
 }
 
-.settings-grid {
+.settings-grid,
+.settings-stack {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 16px;
+}
+
+.settings-stack {
+  grid-template-columns: minmax(0, 1fr);
+  max-width: 760px;
 }
 
 .admin-overview-grid {

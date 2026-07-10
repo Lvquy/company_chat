@@ -89,6 +89,14 @@ Sửa lại tối thiểu các biến sau trong `.env.production`:
 - `JWT_ACCESS_SECRET`
 - `JWT_REFRESH_SECRET`
 - `APP_ORIGIN`
+- `MINIO_PUBLIC_BASE_URL`
+
+Ví dụ:
+
+```env
+APP_ORIGIN=http://IP_SERVER:8080
+MINIO_PUBLIC_BASE_URL=http://IP_SERVER:8080/minio
+```
 
 ### 2. Build và chạy stack production
 
@@ -128,6 +136,7 @@ Với cấu hình hiện tại:
 
 - Web UI đi qua cùng domain
 - REST API đi qua `/api`
+- File/ảnh MinIO đi qua `/minio`
 - Socket.IO đi cùng domain qua `nginx`
 
 Ví dụ:
@@ -136,6 +145,29 @@ Ví dụ:
 - API: `https://chat.example.com/api`
 - MinIO API: `http://IP_SERVER:9000`
 - MinIO Console: `http://IP_SERVER:9001`
+
+### 5. Build lại khi code thay đổi
+
+Mỗi lần source code thay đổi trên GitHub, trên server Ubuntu chỉ cần chạy lại:
+
+```bash
+cd ~/company_chat
+git pull
+docker compose --env-file .env.production -f docker-compose.prod.yml up -d --build
+docker compose --env-file .env.production -f docker-compose.prod.yml exec backend pnpm prisma migrate deploy
+```
+
+Giải thích ngắn:
+
+- `git pull`: lấy code mới nhất
+- `up -d --build`: rebuild image và khởi động lại container
+- `prisma migrate deploy`: áp các migration DB mới nếu có
+
+Nếu dự án có dữ liệu mẫu mới và anh muốn nạp thêm seed:
+
+```bash
+docker compose --env-file .env.production -f docker-compose.prod.yml exec backend pnpm seed
+```
 
 ## Desktop App Và Mobile App
 

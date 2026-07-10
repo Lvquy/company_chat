@@ -30,6 +30,7 @@ declare global {
   interface Window {
     desktopApp?: {
       getConfig: () => Promise<DesktopConfig>;
+      quitApp?: () => Promise<{ ok: boolean }>;
     };
   }
 }
@@ -661,6 +662,51 @@ function NextIcon() {
   );
 }
 
+function UserCircleIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 12.25a3.25 3.25 0 1 0 0-6.5a3.25 3.25 0 0 0 0 6.5Zm-6 6a6 6 0 0 1 12 0"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function LogoutIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M14 7.5V5.8A1.8 1.8 0 0 0 12.2 4H7.8A1.8 1.8 0 0 0 6 5.8v12.4A1.8 1.8 0 0 0 7.8 20h4.4a1.8 1.8 0 0 0 1.8-1.8v-1.7M11 12h9m-3-3 3 3-3 3"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
+function QuitIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M8 8l8 8m0-8-8 8M5.8 4h12.4A1.8 1.8 0 0 1 20 5.8v12.4A1.8 1.8 0 0 1 18.2 20H5.8A1.8 1.8 0 0 1 4 18.2V5.8A1.8 1.8 0 0 1 5.8 4Z"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   const socketRef = useRef<Socket | null>(null);
   const messageStreamRef = useRef<HTMLDivElement | null>(null);
@@ -668,6 +714,7 @@ export default function HomePage() {
   const messageItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const reactionHoverTimeoutRef = useRef<number | null>(null);
   const actionHoverTimeoutRef = useRef<number | null>(null);
+  const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const selectedConversationRef = useRef('');
   const conversationsRef = useRef<Conversation[]>([]);
   const [token, setToken] = useState('');
@@ -689,6 +736,11 @@ export default function HomePage() {
   const [pendingAttachment, setPendingAttachment] = useState<AttachmentResponse | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [notice, setNotice] = useState<string | null>(null);
+  const [adminError, setAdminError] = useState<string | null>(null);
+  const [adminNotice, setAdminNotice] = useState<string | null>(null);
+  const [departmentModalError, setDepartmentModalError] = useState<string | null>(null);
+  const [userModalError, setUserModalError] = useState<string | null>(null);
+  const [resetPasswordModalError, setResetPasswordModalError] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [showGroupModal, setShowGroupModal] = useState(false);
   const [showEmojiMenu, setShowEmojiMenu] = useState(false);
@@ -711,6 +763,8 @@ export default function HomePage() {
   const [deleteUserTarget, setDeleteUserTarget] = useState<AdminUser | null>(null);
   const [showAddMembersModal, setShowAddMembersModal] = useState(false);
   const [groupMemberSelection, setGroupMemberSelection] = useState<string[]>([]);
+  const [showSettingsMenu, setShowSettingsMenu] = useState(false);
+  const [isDesktopApp, setIsDesktopApp] = useState(false);
   const [desktopBranding, setDesktopBranding] = useState<DesktopConfig>({
     serverUrl: '',
     companyName: 'Company Chat',
@@ -747,6 +801,7 @@ export default function HomePage() {
   });
 
   useEffect(() => {
+    setIsDesktopApp(Boolean(window.desktopApp));
     if (!window.desktopApp?.getConfig) {
       return;
     }
@@ -822,6 +877,19 @@ export default function HomePage() {
   }, [selectedConversationId]);
 
   useEffect(() => {
+    if (!showSettingsMenu) return;
+
+    function handlePointerDown(event: MouseEvent) {
+      if (!settingsMenuRef.current?.contains(event.target as Node)) {
+        setShowSettingsMenu(false);
+      }
+    }
+
+    window.addEventListener('mousedown', handlePointerDown);
+    return () => window.removeEventListener('mousedown', handlePointerDown);
+  }, [showSettingsMenu]);
+
+  useEffect(() => {
     conversationsRef.current = conversations;
   }, [conversations]);
 
@@ -845,6 +913,24 @@ export default function HomePage() {
   useEffect(() => {
     setNotice(null);
   }, [mode, adminSection, selectedConversationId]);
+
+  useEffect(() => {
+    setError(null);
+    setAdminError(null);
+    setAdminNotice(null);
+    setDepartmentModalError(null);
+    setUserModalError(null);
+    setResetPasswordModalError(null);
+    setShowSettingsMenu(false);
+  }, [mode]);
+
+  useEffect(() => {
+    setAdminError(null);
+    setAdminNotice(null);
+    setDepartmentModalError(null);
+    setUserModalError(null);
+    setResetPasswordModalError(null);
+  }, [adminSection]);
 
   useEffect(() => {
     setGroupMemberSelection([]);
@@ -881,11 +967,11 @@ export default function HomePage() {
 
     async function fetchMessages() {
       try {
-        const data = await api<Message[]>(`/conversations/messages?conversationId=${selectedConversationId}`, token);
-        startTransition(() => setMessages(data));
-      } catch (err) {
-        handleApiError(err);
-      }
+      const data = await api<Message[]>(`/conversations/messages?conversationId=${selectedConversationId}`, token);
+      startTransition(() => setMessages(data));
+    } catch (err) {
+      handleGlobalApiError(err);
+    }
     }
 
     void fetchMessages();
@@ -1270,13 +1356,71 @@ export default function HomePage() {
     setMode('chats');
   }
 
+  function getApiErrorMessage(err: unknown) {
+    return err instanceof Error ? err.message : 'Unexpected error';
+  }
+
   function handleApiError(err: unknown) {
-    const message = err instanceof Error ? err.message : 'Unexpected error';
+    const message = getApiErrorMessage(err);
     if (message.includes('Invalid or expired token') || message.includes('Missing bearer token')) {
       void clearSession(false);
     }
+    return message;
+  }
+
+  function handleGlobalApiError(err: unknown) {
+    const message = handleApiError(err);
     setNotice(null);
     setError(message);
+  }
+
+  function pushAdminNotice(message: string) {
+    setAdminError(null);
+    setAdminNotice(message);
+  }
+
+  function pushScopedAdminError(
+    err: unknown,
+    scope: 'admin' | 'department-modal' | 'user-modal' | 'reset-password-modal',
+  ) {
+    const message = handleApiError(err);
+    if (scope === 'admin') {
+      setAdminNotice(null);
+      setAdminError(message);
+      return;
+    }
+    if (scope === 'department-modal') {
+      setDepartmentModalError(message);
+      return;
+    }
+    if (scope === 'user-modal') {
+      setUserModalError(message);
+      return;
+    }
+    setResetPasswordModalError(message);
+  }
+
+  function clearAdminFeedback() {
+    setAdminError(null);
+    setAdminNotice(null);
+    setDepartmentModalError(null);
+    setUserModalError(null);
+    setResetPasswordModalError(null);
+  }
+
+  function openSettingsScreen() {
+    setShowSettingsMenu(false);
+    setError(null);
+    setNotice(null);
+    setMode('settings');
+  }
+
+  async function handleQuitDesktopApp() {
+    try {
+      await window.desktopApp?.quitApp?.();
+    } catch {
+      // ignore desktop quit bridge failures
+    }
   }
 
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
@@ -1293,7 +1437,7 @@ export default function HomePage() {
       setCurrentUser(result.user);
       await refreshData(result.accessToken, result.user.isAdmin);
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1309,7 +1453,7 @@ export default function HomePage() {
       await refreshData();
       openConversation(conversation.id);
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1334,7 +1478,7 @@ export default function HomePage() {
       openConversation(conversation.id);
       setNotice('Đã tạo nhóm mới.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1354,7 +1498,7 @@ export default function HomePage() {
       await refreshSelectedMessages(selectedConversation.id);
       setNotice('Đã thêm thành viên vào nhóm.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1371,7 +1515,7 @@ export default function HomePage() {
       await refreshSelectedMessages(selectedConversation.id);
       setNotice('Đã xóa thành viên khỏi nhóm.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1390,7 +1534,7 @@ export default function HomePage() {
       setMessages([]);
       setNotice('Đã giải tán nhóm.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1410,7 +1554,7 @@ export default function HomePage() {
       setPendingAttachment(uploaded);
       setNotice(`Đã thêm ${uploaded.originalName}.`);
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
       event.target.value = '';
@@ -1464,7 +1608,7 @@ export default function HomePage() {
           }),
       );
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1488,7 +1632,7 @@ export default function HomePage() {
       setMessages((prev) => prev.map((message) => (message.id === messageId ? updated : message)));
       setActiveReactionPickerId(null);
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     }
   }
 
@@ -1618,7 +1762,7 @@ export default function HomePage() {
       setCurrentUser(updated);
       setNotice('Đã cập nhật tài khoản.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1635,7 +1779,7 @@ export default function HomePage() {
       setPasswordForm({ currentPassword: '', newPassword: '' });
       setNotice('Đổi mật khẩu thành công.');
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
     }
@@ -1643,6 +1787,7 @@ export default function HomePage() {
 
   async function submitDepartment() {
     setBusy('department');
+    setDepartmentModalError(null);
     try {
       await api(editingDepartmentId ? `/departments/${editingDepartmentId}` : '/departments', token, {
         method: editingDepartmentId ? 'PATCH' : 'POST',
@@ -1652,9 +1797,9 @@ export default function HomePage() {
       setShowDepartmentCreateModal(false);
       setEditingDepartmentId(null);
       await refreshData();
-      setNotice(editingDepartmentId ? 'Đã cập nhật phòng ban.' : 'Đã tạo phòng ban.');
+      pushAdminNotice(editingDepartmentId ? 'Đã cập nhật phòng ban.' : 'Đã tạo phòng ban.');
     } catch (err) {
-      handleApiError(err);
+      pushScopedAdminError(err, 'department-modal');
     } finally {
       setBusy(null);
     }
@@ -1662,6 +1807,7 @@ export default function HomePage() {
 
   async function submitUser() {
     setBusy('user');
+    setUserModalError(null);
     try {
       const payload = {
         ...userForm,
@@ -1674,9 +1820,9 @@ export default function HomePage() {
       resetUserEditor();
       setShowUserCreateModal(false);
       await refreshData();
-      setNotice(editingUserId ? 'Đã cập nhật user.' : 'Đã tạo user.');
+      pushAdminNotice(editingUserId ? 'Đã cập nhật user.' : 'Đã tạo user.');
     } catch (err) {
-      handleApiError(err);
+      pushScopedAdminError(err, 'user-modal');
     } finally {
       setBusy(null);
     }
@@ -1685,6 +1831,7 @@ export default function HomePage() {
   async function handleResetUserPassword() {
     if (!resetPasswordUser || resetPasswordValue.trim().length < 6) return;
     setBusy('reset-password');
+    setResetPasswordModalError(null);
     try {
       await api(`/users/${resetPasswordUser.id}/reset-password`, token, {
         method: 'POST',
@@ -1692,9 +1839,9 @@ export default function HomePage() {
       });
       setResetPasswordUser(null);
       setResetPasswordValue('');
-      setNotice('Đã cấp lại mật khẩu.');
+      pushAdminNotice('Đã cấp lại mật khẩu.');
     } catch (err) {
-      handleApiError(err);
+      pushScopedAdminError(err, 'reset-password-modal');
     } finally {
       setBusy(null);
     }
@@ -1719,6 +1866,7 @@ export default function HomePage() {
 
   function handleEditDepartment(department: Department) {
     setShowDepartmentCreateModal(false);
+    clearAdminFeedback();
     setEditingDepartmentId(department.id);
     setDepartmentForm({
       name: department.name,
@@ -1734,9 +1882,9 @@ export default function HomePage() {
         resetDepartmentEditor();
       }
       await refreshData();
-      setNotice('Đã xóa phòng ban.');
+      pushAdminNotice('Đã xóa phòng ban.');
     } catch (err) {
-      handleApiError(err);
+      pushScopedAdminError(err, 'admin');
     } finally {
       setBusy(null);
     }
@@ -1744,6 +1892,7 @@ export default function HomePage() {
 
   function handleEditUser(user: AdminUser) {
     setShowUserCreateModal(false);
+    clearAdminFeedback();
     setEditingUserId(user.id);
     setUserForm({
       username: user.username,
@@ -1764,9 +1913,9 @@ export default function HomePage() {
         resetUserEditor();
       }
       await refreshData();
-      setNotice('Đã xóa user.');
+      pushAdminNotice('Đã xóa user.');
     } catch (err) {
-      handleApiError(err);
+      pushScopedAdminError(err, 'admin');
     } finally {
       setBusy(null);
     }
@@ -1791,7 +1940,7 @@ export default function HomePage() {
       });
       setProfileForm((prev) => ({ ...prev, avatarUrl: uploaded.downloadUrl }));
     } catch (err) {
-      handleApiError(err);
+      handleGlobalApiError(err);
     } finally {
       setBusy(null);
       event.target.value = '';
@@ -2092,6 +2241,7 @@ export default function HomePage() {
           className="modal-backdrop"
           onClick={() => {
             setShowDepartmentCreateModal(false);
+            setDepartmentModalError(null);
             resetDepartmentEditor();
           }}
         >
@@ -2101,10 +2251,11 @@ export default function HomePage() {
               <span>Nhập thông tin phòng ban mới.</span>
             </div>
             <div className="stack detail-modal-body">
+              {departmentModalError ? <div className="error-banner inline">{departmentModalError}</div> : null}
               <input value={departmentForm.name} placeholder="Tên phòng ban" onChange={(event) => setDepartmentForm((prev) => ({ ...prev, name: event.target.value }))} />
             </div>
             <div className="modal-actions">
-              <button type="button" className="ghost-action" onClick={() => { setShowDepartmentCreateModal(false); resetDepartmentEditor(); }}>
+              <button type="button" className="ghost-action" onClick={() => { setShowDepartmentCreateModal(false); setDepartmentModalError(null); resetDepartmentEditor(); }}>
                 Hủy
               </button>
               <button type="button" disabled={busy === 'department' || !departmentForm.name.trim()} onClick={() => void submitDepartment()}>
@@ -2120,6 +2271,7 @@ export default function HomePage() {
           className="modal-backdrop"
           onClick={() => {
             setShowUserCreateModal(false);
+            setUserModalError(null);
             resetUserEditor();
           }}
         >
@@ -2129,6 +2281,7 @@ export default function HomePage() {
               <span>Nhập thông tin đăng nhập và hiển thị.</span>
             </div>
             <div className="stack detail-modal-body">
+              {userModalError ? <div className="error-banner inline">{userModalError}</div> : null}
               <input value={userForm.fullName} placeholder="Tên hiển thị" onChange={(event) => setUserForm((prev) => ({ ...prev, fullName: event.target.value }))} />
               <input value={userForm.username} placeholder="Username" onChange={(event) => setUserForm((prev) => ({ ...prev, username: event.target.value }))} />
               <input type="password" value={userForm.password} placeholder="Mật khẩu" onChange={(event) => setUserForm((prev) => ({ ...prev, password: event.target.value }))} />
@@ -2154,7 +2307,7 @@ export default function HomePage() {
               </select>
             </div>
             <div className="modal-actions">
-              <button type="button" className="ghost-action" onClick={() => { setShowUserCreateModal(false); resetUserEditor(); }}>
+              <button type="button" className="ghost-action" onClick={() => { setShowUserCreateModal(false); setUserModalError(null); resetUserEditor(); }}>
                 Hủy
               </button>
               <button type="button" disabled={busy === 'user' || !userForm.fullName.trim() || !userForm.username.trim() || userForm.password.trim().length < 6} onClick={() => void submitUser()}>
@@ -2171,6 +2324,7 @@ export default function HomePage() {
           onClick={() => {
             setResetPasswordUser(null);
             setResetPasswordValue('');
+            setResetPasswordModalError(null);
           }}
         >
           <div className="modal-card detail-modal" onClick={(event) => event.stopPropagation()}>
@@ -2179,6 +2333,7 @@ export default function HomePage() {
               <span>{resetPasswordUser.fullName}</span>
             </div>
             <div className="stack detail-modal-body">
+              {resetPasswordModalError ? <div className="error-banner inline">{resetPasswordModalError}</div> : null}
               <input
                 type="password"
                 placeholder="Mật khẩu mới"
@@ -2193,6 +2348,7 @@ export default function HomePage() {
                 onClick={() => {
                   setResetPasswordUser(null);
                   setResetPasswordValue('');
+                  setResetPasswordModalError(null);
                 }}
               >
                 Hủy
@@ -2243,13 +2399,16 @@ export default function HomePage() {
       <div className={`messenger-shell ${mode === 'settings' || mode === 'admin' ? 'shell-settings' : ''}`}>
         <aside className="nav-rail">
           <div className="rail-top">
-            <button type="button" className="avatar-rail-button" onClick={() => setMode('settings')}>
+            <button type="button" className="avatar-rail-button" onClick={openSettingsScreen}>
               <Avatar avatarUrl={currentUser.avatarUrl} name={currentUser.fullName} size="md" />
             </button>
             <button
               type="button"
               className={mode === 'chats' ? 'rail-button active' : 'rail-button'}
-              onClick={() => setMode('chats')}
+              onClick={() => {
+                setShowSettingsMenu(false);
+                setMode('chats');
+              }}
               aria-label="Tin nhắn"
             >
               <ChatIcon />
@@ -2257,7 +2416,10 @@ export default function HomePage() {
             <button
               type="button"
               className={mode === 'contacts' ? 'rail-button active' : 'rail-button'}
-              onClick={() => setMode('contacts')}
+              onClick={() => {
+                setShowSettingsMenu(false);
+                setMode('contacts');
+              }}
               aria-label="Danh bạ"
             >
               <ContactsIcon />
@@ -2268,20 +2430,65 @@ export default function HomePage() {
               <button
                 type="button"
                 className={mode === 'admin' ? 'rail-button active' : 'rail-button'}
-                onClick={() => setMode('admin')}
+                onClick={() => {
+                  setShowSettingsMenu(false);
+                  setMode('admin');
+                }}
                 aria-label="Quản trị"
               >
                 <DashboardIcon />
               </button>
             ) : null}
-            <button
-              type="button"
-              className={mode === 'settings' ? 'rail-button active' : 'rail-button'}
-              onClick={() => setMode('settings')}
-              aria-label="Cài đặt"
-            >
-              <SettingsIcon />
-            </button>
+            <div className="settings-menu-anchor" ref={settingsMenuRef}>
+              {showSettingsMenu ? (
+                <div className="settings-popover">
+                  <button type="button" className="settings-popover-profile" onClick={openSettingsScreen}>
+                    <Avatar avatarUrl={currentUser.avatarUrl} name={currentUser.fullName} size="md" />
+                    <span className="settings-popover-profile-copy">
+                      <strong>{currentUser.fullName}</strong>
+                      <small>@{currentUser.username}</small>
+                    </span>
+                  </button>
+                  <div className="settings-popover-section">
+                    <button type="button" className="settings-popover-item" onClick={openSettingsScreen}>
+                      <UserCircleIcon />
+                      <span>Thông tin tài khoản</span>
+                    </button>
+                    <button type="button" className="settings-popover-item" onClick={openSettingsScreen}>
+                      <SettingsIcon />
+                      <span>Cài đặt</span>
+                    </button>
+                  </div>
+                  <div className="settings-popover-section settings-popover-section-danger">
+                    <button
+                      type="button"
+                      className="settings-popover-item settings-popover-item-danger"
+                      onClick={() => {
+                        setShowSettingsMenu(false);
+                        void clearSession();
+                      }}
+                    >
+                      <LogoutIcon />
+                      <span>Đăng xuất</span>
+                    </button>
+                    {isDesktopApp ? (
+                      <button type="button" className="settings-popover-item" onClick={() => void handleQuitDesktopApp()}>
+                        <QuitIcon />
+                        <span>Thoát</span>
+                      </button>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              <button
+                type="button"
+                className={mode === 'settings' || showSettingsMenu ? 'rail-button active' : 'rail-button'}
+                onClick={() => setShowSettingsMenu((prev) => !prev)}
+                aria-label="Cài đặt"
+              >
+                <SettingsIcon />
+              </button>
+            </div>
           </div>
         </aside>
 
@@ -2297,8 +2504,8 @@ export default function HomePage() {
                   Về cài đặt
                 </button>
               </div>
-              {error ? <div className="error-banner inline">{error}</div> : null}
-              {notice ? <div className="notice-banner">{notice}</div> : null}
+              {adminError ? <div className="error-banner inline">{adminError}</div> : null}
+              {adminNotice ? <div className="notice-banner">{adminNotice}</div> : null}
 
               <div className="admin-overview-grid">
                 <div className="detail-card detail-card-dark admin-overview-card">
@@ -2548,21 +2755,21 @@ export default function HomePage() {
           <section className="settings-screen">
             <div className="settings-card">
               <div className="settings-header">
-                <h2>Cài đặt tài khoản</h2>
-                <button type="button" className="ghost-action" onClick={() => void clearSession()}>
-                  Đăng xuất
-                </button>
+                <div>
+                  <h2>Cài đặt tài khoản</h2>
+                  <p className="chat-subtitle">Cập nhật ảnh đại diện, tên hiển thị và mật khẩu.</p>
+                </div>
               </div>
               {error ? <div className="error-banner inline">{error}</div> : null}
               {notice ? <div className="notice-banner">{notice}</div> : null}
-              <div className="settings-grid">
+              <div className="settings-stack">
                 <form className="detail-card detail-card-dark stack" onSubmit={handleSaveProfile}>
                   <h3>Thông tin cá nhân</h3>
                   <div className="profile-editor">
                     <Avatar avatarUrl={profileForm.avatarUrl} name={profileForm.fullName || currentUser.fullName} size="lg" />
                     <label className="secondary-action">
                       <input type="file" accept="image/*" onChange={handleAvatarUpload} />
-                      {busy === 'avatar' ? 'Đang tải ảnh...' : 'Chọn ảnh đại diện'}
+                    {busy === 'avatar' ? 'Đang tải ảnh...' : 'Chọn ảnh đại diện'}
                     </label>
                   </div>
                   <input
@@ -2574,7 +2781,6 @@ export default function HomePage() {
                     {busy === 'profile' ? 'Đang lưu...' : 'Lưu thay đổi'}
                   </button>
                 </form>
-
                 <form className="detail-card detail-card-dark stack" onSubmit={handleChangePassword}>
                   <h3>Đổi mật khẩu</h3>
                   <input
@@ -2593,7 +2799,6 @@ export default function HomePage() {
                     {busy === 'password' ? 'Đang lưu...' : 'Đổi mật khẩu'}
                   </button>
                 </form>
-
               </div>
             </div>
           </section>

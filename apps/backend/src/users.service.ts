@@ -2,6 +2,7 @@ import { BadRequestException, Injectable } from '@nestjs/common';
 import { Prisma } from '@prisma/client';
 import { createHash } from 'node:crypto';
 import { PrismaService } from './prisma.service';
+import { StorageService } from './storage.service';
 
 type CreateUserInput = {
   username: string;
@@ -23,7 +24,10 @@ type UpdateUserInput = {
 
 @Injectable()
 export class UsersService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   private adminUserSelect = {
     id: true,
@@ -55,6 +59,13 @@ export class UsersService {
     },
   } satisfies Prisma.UserSelect;
 
+  private normalizeAdminUser<T extends { avatarUrl?: string | null }>(user: T) {
+    return {
+      ...user,
+      avatarUrl: this.storage.resolveStoredUrl(user.avatarUrl),
+    };
+  }
+
   async findAll() {
     const users = await this.prisma.user.findMany({
       where: {
@@ -67,7 +78,7 @@ export class UsersService {
     });
 
     return users.map((user) => ({
-      ...user,
+      ...this.normalizeAdminUser(user),
       lastLoginAt: user.loginActivities[0]?.loggedInAt ?? null,
       lastLoginIp: user.loginActivities[0]?.ipAddress ?? null,
       loginActivities: undefined,
@@ -75,7 +86,7 @@ export class UsersService {
   }
 
   async directory(currentUserId: string) {
-    return this.prisma.user.findMany({
+    const users = await this.prisma.user.findMany({
       where: {
         id: { not: currentUserId },
         username: {
@@ -96,6 +107,8 @@ export class UsersService {
         },
       },
     });
+
+    return users.map((user) => this.normalizeAdminUser(user));
   }
 
   async create(input: CreateUserInput) {
@@ -127,7 +140,7 @@ export class UsersService {
     });
 
     return {
-      ...user,
+      ...this.normalizeAdminUser(user),
       lastLoginAt: user.loginActivities[0]?.loggedInAt ?? null,
       lastLoginIp: user.loginActivities[0]?.ipAddress ?? null,
       loginActivities: undefined,
@@ -187,7 +200,7 @@ export class UsersService {
     });
 
     return {
-      ...user,
+      ...this.normalizeAdminUser(user),
       lastLoginAt: user.loginActivities[0]?.loggedInAt ?? null,
       lastLoginIp: user.loginActivities[0]?.ipAddress ?? null,
       loginActivities: undefined,

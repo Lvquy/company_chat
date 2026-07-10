@@ -255,6 +255,11 @@ ipcMain.handle("desktop:pick-logo", async () => {
   };
 });
 
+ipcMain.handle("desktop:quit-app", () => {
+  app.quit();
+  return { ok: true };
+});
+
 app.on("window-all-closed", () => {
   if (process.platform !== "darwin") {
     app.quit();

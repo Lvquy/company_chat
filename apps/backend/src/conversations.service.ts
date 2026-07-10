@@ -25,9 +25,27 @@ export class ConversationsService {
     private readonly storage: StorageService,
   ) {}
 
+  private normalizeUserAvatar<T extends { avatarUrl?: string | null }>(user: T) {
+    return {
+      ...user,
+      avatarUrl: this.storage.resolveStoredUrl(user.avatarUrl),
+    };
+  }
+
   private async enrichMessage<T extends { attachments: Array<{ attachment: { storageKey: string } }> }>(message: T) {
     return {
       ...message,
+      sender: 'sender' in message && message.sender ? this.normalizeUserAvatar(message.sender as { avatarUrl?: string | null }) : undefined,
+      replyTo:
+        'replyTo' in message && message.replyTo
+          ? {
+              ...(message.replyTo as Record<string, unknown>),
+              sender:
+                'sender' in (message.replyTo as Record<string, unknown>) && (message.replyTo as { sender?: { avatarUrl?: string | null } }).sender
+                  ? this.normalizeUserAvatar((message.replyTo as { sender: { avatarUrl?: string | null } }).sender)
+                  : undefined,
+            }
+          : undefined,
       attachments: await Promise.all(
         message.attachments.map(async (item) => ({
           ...item,
@@ -162,7 +180,7 @@ export class ConversationsService {
   }
 
   async findAll(userId?: string) {
-    return this.prisma.conversation.findMany({
+    const conversations = await this.prisma.conversation.findMany({
       where: userId
         ? {
             members: {
@@ -183,6 +201,14 @@ export class ConversationsService {
         },
       },
     });
+
+    return conversations.map((conversation) => ({
+      ...conversation,
+      members: conversation.members.map((member) => ({
+        ...member,
+        user: this.normalizeUserAvatar(member.user),
+      })),
+    }));
   }
 
   async findOrCreateDirect(currentUserId: string, targetUserId: string) {
@@ -208,7 +234,13 @@ export class ConversationsService {
     });
 
     if (existing) {
-      return existing;
+      return {
+        ...existing,
+        members: existing.members.map((member) => ({
+          ...member,
+          user: this.normalizeUserAvatar(member.user),
+        })),
+      };
     }
 
     return this.create({
@@ -233,7 +265,7 @@ export class ConversationsService {
       throw new BadRequestException('Group conversation requires at least 2 members');
     }
 
-    return this.prisma.conversation.create({
+    const conversation = await this.prisma.conversation.create({
       data: {
         type: input.type === 'GROUP' ? ConversationType.GROUP : ConversationType.DIRECT,
         title: input.type === 'GROUP' ? input.title?.trim() || 'New Group' : null,
@@ -254,6 +286,14 @@ export class ConversationsService {
         },
       },
     });
+
+    return {
+      ...conversation,
+      members: conversation.members.map((member) => ({
+        ...member,
+        user: this.normalizeUserAvatar(member.user),
+      })),
+    };
   }
 
   async findMessages(conversationId: string, userId: string) {

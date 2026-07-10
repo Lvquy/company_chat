@@ -3,10 +3,14 @@ import { sign, verify } from 'jsonwebtoken';
 import { createHash } from 'node:crypto';
 import { PrismaService } from './prisma.service';
 import { AuthUser } from './auth.types';
+import { StorageService } from './storage.service';
 
 @Injectable()
 export class AuthService {
-  constructor(private readonly prisma: PrismaService) {}
+  constructor(
+    private readonly prisma: PrismaService,
+    private readonly storage: StorageService,
+  ) {}
 
   private get accessSecret() {
     return process.env.JWT_ACCESS_SECRET ?? 'local-access-secret-123';
@@ -63,7 +67,7 @@ export class AuthService {
         id: user.id,
         username: user.username,
         fullName: user.fullName,
-        avatarUrl: user.avatarUrl,
+        avatarUrl: this.storage.resolveStoredUrl(user.avatarUrl),
         status: user.status,
         isAdmin: user.username === 'admin',
         departments: user.departments.map((item) => item.department),
@@ -102,6 +106,7 @@ export class AuthService {
 
     return {
       ...user,
+      avatarUrl: this.storage.resolveStoredUrl(user.avatarUrl),
       isAdmin: user.username === 'admin',
       departments: user.departments.map((item) => item.department),
     };
