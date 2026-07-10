@@ -22,15 +22,22 @@ const REACTION_PICKER_OPEN_DELAY_MS = 1000;
 
 type DesktopConfig = {
   serverUrl: string;
+};
+
+type AppBranding = {
   companyName: string;
-  logoDataUrl: string;
+  logoUrl: string;
 };
 
 declare global {
   interface Window {
     desktopApp?: {
       getConfig: () => Promise<DesktopConfig>;
+      notify?: (payload: { title: string; body: string; conversationId?: string }) => Promise<{ ok: boolean }>;
+      setBadgeCount?: (count: number) => Promise<{ ok: boolean }>;
+      onNotificationClick?: (callback: (payload: { conversationId?: string }) => void) => () => void;
       quitApp?: () => Promise<{ ok: boolean }>;
+      reloadChat?: () => Promise<{ ok: boolean }>;
     };
   }
 }
@@ -143,13 +150,6 @@ type AttachmentResponse = {
   id: string;
   originalName: string;
   downloadUrl: string;
-};
-
-type IncomingToast = {
-  conversationId: string;
-  title: string;
-  body: string;
-  avatarUrl?: string | null;
 };
 
 type AdminUser = {
@@ -662,6 +662,21 @@ function NextIcon() {
   );
 }
 
+function RefreshIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M19 6.5v5h-5M5 17.5v-5h5m8.1-1.8A7 7 0 0 0 6.6 8.4M5.9 13.3A7 7 0 0 0 17.4 15.6"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 function UserCircleIcon() {
   return (
     <svg viewBox="0 0 24 24" aria-hidden="true">
@@ -748,7 +763,6 @@ export default function HomePage() {
   const [replyTarget, setReplyTarget] = useState<Message | null>(null);
   const [unreadCounts, setUnreadCounts] = useState<Record<string, number>>({});
   const [mutedConversationIds, setMutedConversationIds] = useState<string[]>([]);
-  const [incomingToast, setIncomingToast] = useState<IncomingToast | null>(null);
   const [activeReactionPickerId, setActiveReactionPickerId] = useState<string | null>(null);
   const [detailMessage, setDetailMessage] = useState<Message | null>(null);
   const [activeMessageActionsId, setActiveMessageActionsId] = useState<string | null>(null);
@@ -765,10 +779,9 @@ export default function HomePage() {
   const [groupMemberSelection, setGroupMemberSelection] = useState<string[]>([]);
   const [showSettingsMenu, setShowSettingsMenu] = useState(false);
   const [isDesktopApp, setIsDesktopApp] = useState(false);
-  const [desktopBranding, setDesktopBranding] = useState<DesktopConfig>({
-    serverUrl: '',
+  const [appBranding, setAppBranding] = useState<AppBranding>({
     companyName: 'Company Chat',
-    logoDataUrl: '',
+    logoUrl: '',
   });
 
   const [loginForm, setLoginForm] = useState({
@@ -799,23 +812,43 @@ export default function HomePage() {
     fullName: '',
     avatarUrl: '',
   });
+  const [brandingForm, setBrandingForm] = useState({
+    companyName: 'Company Chat',
+    logoUrl: '',
+  });
 
   useEffect(() => {
-    setIsDesktopApp(Boolean(window.desktopApp));
-    if (!window.desktopApp?.getConfig) {
-      return;
+    const hasDesktopBridge = Boolean(window.desktopApp);
+    const isElectronRuntime =
+      typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent);
+    setIsDesktopApp(hasDesktopBridge || isElectronRuntime);
+  }, []);
+
+  useEffect(() => {
+    async function loadBranding() {
+      try {
+        const branding = await api<AppBranding>('/app-config');
+        setAppBranding({
+          companyName: branding.companyName || 'Company Chat',
+          logoUrl: branding.logoUrl || '',
+        });
+        setBrandingForm({
+          companyName: branding.companyName || 'Company Chat',
+          logoUrl: branding.logoUrl || '',
+        });
+      } catch {
+        setAppBranding({
+          companyName: 'Company Chat',
+          logoUrl: '',
+        });
+        setBrandingForm({
+          companyName: 'Company Chat',
+          logoUrl: '',
+        });
+      }
     }
 
-    window.desktopApp
-      .getConfig()
-      .then((config) => {
-        setDesktopBranding({
-          serverUrl: config.serverUrl || '',
-          companyName: config.companyName || 'Company Chat',
-          logoDataUrl: config.logoDataUrl || '',
-        });
-      })
-      .catch(() => undefined);
+    void loadBranding();
   }, []);
 
   useEffect(() => {
@@ -867,6 +900,20 @@ export default function HomePage() {
   }, [currentUser]);
 
   useEffect(() => {
+    if (!window.desktopApp?.onNotificationClick) {
+      return;
+    }
+
+    const cleanup = window.desktopApp.onNotificationClick((payload) => {
+      if (payload?.conversationId) {
+        openConversation(payload.conversationId);
+      }
+    });
+
+    return cleanup;
+  }, []);
+
+  useEffect(() => {
     selectedConversationRef.current = selectedConversationId;
   }, [selectedConversationId]);
 
@@ -903,12 +950,6 @@ export default function HomePage() {
     const timeoutId = window.setTimeout(() => setNotice(null), 2600);
     return () => window.clearTimeout(timeoutId);
   }, [notice]);
-
-  useEffect(() => {
-    if (!incomingToast) return;
-    const timeoutId = window.setTimeout(() => setIncomingToast(null), 4200);
-    return () => window.clearTimeout(timeoutId);
-  }, [incomingToast]);
 
   useEffect(() => {
     setNotice(null);
@@ -1038,13 +1079,11 @@ export default function HomePage() {
         ? getConversationTitle(conversation, currentUser.id)
         : message.sender.fullName;
       const body = message.body?.trim() || 'Đã gửi một file đính kèm';
+      const isMacDesktop =
+        typeof navigator !== 'undefined' &&
+        /mac/i.test(navigator.platform) &&
+        (Boolean(window.desktopApp) || /electron/i.test(navigator.userAgent));
 
-      setIncomingToast({
-        conversationId: message.conversationId,
-        title,
-        body,
-        avatarUrl: message.sender.avatarUrl ?? null,
-      });
       playIncomingNotificationSound();
 
       if (!isActiveConversation || !isVisible) {
@@ -1054,21 +1093,26 @@ export default function HomePage() {
         }));
       }
 
-      if (
-        typeof window !== 'undefined' &&
-        'Notification' in window &&
-        Notification.permission === 'granted' &&
-        (!isActiveConversation || !isVisible)
-      ) {
-        const notification = new Notification(title, {
-          body,
-          icon: message.sender.avatarUrl ?? undefined,
-          tag: message.conversationId,
-        });
-        notification.onclick = () => {
-          window.focus();
-          openConversation(message.conversationId);
-        };
+      if (!isActiveConversation || !isVisible) {
+        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+          const notification = new Notification(title, {
+            body,
+            icon: message.sender.avatarUrl ?? undefined,
+            tag: `${message.conversationId}-${message.id}`,
+          });
+          notification.onclick = () => {
+            window.focus();
+            openConversation(message.conversationId);
+          };
+        }
+
+        if (window.desktopApp?.notify && !isMacDesktop) {
+          void window.desktopApp.notify({
+            title,
+            body,
+            conversationId: message.conversationId,
+          });
+        }
       }
     });
 
@@ -1097,9 +1141,12 @@ export default function HomePage() {
 
   useEffect(() => {
     const totalUnread = Object.values(unreadCounts).reduce((sum, count) => sum + count, 0);
-    const appTitle = desktopBranding.companyName || 'Company Chat';
+    const appTitle = appBranding.companyName || 'Company Chat';
     document.title = totalUnread > 0 ? `(${totalUnread}) ${appTitle}` : appTitle;
-  }, [desktopBranding.companyName, unreadCounts]);
+    if (window.desktopApp?.setBadgeCount) {
+      void window.desktopApp.setBadgeCount(totalUnread);
+    }
+  }, [appBranding.companyName, unreadCounts]);
 
   const selectedConversation = useMemo(
     () => conversations.find((item) => item.id === selectedConversationId) ?? null,
@@ -1423,6 +1470,20 @@ export default function HomePage() {
     }
   }
 
+  async function handleReloadClient() {
+    setShowSettingsMenu(false);
+    try {
+      if (window.desktopApp?.reloadChat) {
+        await window.desktopApp.reloadChat();
+        return;
+      }
+    } catch {
+      // fallback to browser reload below
+    }
+
+    window.location.reload();
+  }
+
   async function handleLogin(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
     setBusy('login');
@@ -1731,7 +1792,6 @@ export default function HomePage() {
   function openConversation(conversationId: string) {
     setSelectedConversationId(conversationId);
     setMode('chats');
-    setIncomingToast(null);
     setUnreadCounts((prev) => {
       if (!prev[conversationId]) return prev;
       const next = { ...prev };
@@ -1778,6 +1838,50 @@ export default function HomePage() {
       });
       setPasswordForm({ currentPassword: '', newPassword: '' });
       setNotice('Đổi mật khẩu thành công.');
+    } catch (err) {
+      handleGlobalApiError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function handleBrandLogoUpload(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0];
+    if (!file) return;
+    setBusy('branding-logo');
+    try {
+      const formData = new FormData();
+      formData.append('file', file);
+      const uploaded = await api<AttachmentResponse>('/attachments', token, {
+        method: 'POST',
+        body: formData,
+      });
+      setBrandingForm((prev) => ({ ...prev, logoUrl: uploaded.downloadUrl }));
+    } catch (err) {
+      handleGlobalApiError(err);
+    } finally {
+      setBusy(null);
+      event.target.value = '';
+    }
+  }
+
+  async function handleSaveBranding(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    setBusy('branding');
+    try {
+      const updated = await api<AppBranding>('/app-config', token, {
+        method: 'POST',
+        body: JSON.stringify(brandingForm),
+      });
+      setAppBranding({
+        companyName: updated.companyName || 'Company Chat',
+        logoUrl: updated.logoUrl || '',
+      });
+      setBrandingForm({
+        companyName: updated.companyName || 'Company Chat',
+        logoUrl: updated.logoUrl || '',
+      });
+      setNotice('Đã cập nhật thương hiệu ứng dụng.');
     } catch (err) {
       handleGlobalApiError(err);
     } finally {
@@ -1978,20 +2082,20 @@ export default function HomePage() {
         <div className="login-shell">
           <section className="login-card">
             <div className="login-brand">
-              {desktopBranding.logoDataUrl ? (
+              {appBranding.logoUrl ? (
                 // eslint-disable-next-line @next/next/no-img-element
                 <img
-                  alt={desktopBranding.companyName}
+                  alt={appBranding.companyName}
                   className="brand-mark brand-mark-image"
-                  src={desktopBranding.logoDataUrl}
+                  src={appBranding.logoUrl}
                 />
               ) : (
                 <div className="brand-mark">
-                  {getInitials(desktopBranding.companyName || 'Company Chat').slice(0, 1)}
+                  {getInitials(appBranding.companyName || 'Company Chat').slice(0, 1)}
                 </div>
               )}
               <div>
-                <strong>{desktopBranding.companyName || 'Company Chat'}</strong>
+                <strong>{appBranding.companyName || 'Company Chat'}</strong>
                 <span>Trao đổi nội bộ</span>
               </div>
             </div>
@@ -2020,22 +2124,6 @@ export default function HomePage() {
 
   return (
     <main className="app-screen">
-      {incomingToast ? (
-        <button
-          type="button"
-          className="incoming-toast"
-          onClick={() => {
-            openConversation(incomingToast.conversationId);
-          }}
-        >
-          <Avatar avatarUrl={incomingToast.avatarUrl} name={incomingToast.title} size="sm" />
-          <div className="incoming-toast-copy">
-            <strong>{incomingToast.title}</strong>
-            <span>{incomingToast.body}</span>
-          </div>
-        </button>
-      ) : null}
-
       {showGroupModal ? (
         <div className="modal-backdrop" onClick={() => setShowGroupModal(false)}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
@@ -2426,6 +2514,9 @@ export default function HomePage() {
             </button>
           </div>
           <div className="rail-bottom">
+            <button type="button" className="rail-button" onClick={() => void handleReloadClient()} aria-label="Làm mới">
+              <RefreshIcon />
+            </button>
             {currentUser.isAdmin ? (
               <button
                 type="button"
@@ -2799,6 +2890,27 @@ export default function HomePage() {
                     {busy === 'password' ? 'Đang lưu...' : 'Đổi mật khẩu'}
                   </button>
                 </form>
+
+                {currentUser.isAdmin ? (
+                  <form className="detail-card detail-card-dark stack" onSubmit={handleSaveBranding}>
+                    <h3>Thương hiệu ứng dụng</h3>
+                    <div className="profile-editor">
+                      <Avatar avatarUrl={brandingForm.logoUrl} name={brandingForm.companyName || 'Company Chat'} size="lg" />
+                      <label className="secondary-action">
+                        <input type="file" accept="image/*" onChange={handleBrandLogoUpload} />
+                        {busy === 'branding-logo' ? 'Đang tải logo...' : 'Chọn logo công ty'}
+                      </label>
+                    </div>
+                    <input
+                      placeholder="Tên công ty / tên ứng dụng"
+                      value={brandingForm.companyName}
+                      onChange={(event) => setBrandingForm((prev) => ({ ...prev, companyName: event.target.value }))}
+                    />
+                    <button type="submit" disabled={busy === 'branding' || !brandingForm.companyName.trim()}>
+                      {busy === 'branding' ? 'Đang lưu...' : 'Lưu thương hiệu'}
+                    </button>
+                  </form>
+                ) : null}
               </div>
             </div>
           </section>

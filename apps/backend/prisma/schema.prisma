@@ -186,3 +186,11 @@ model AttendanceRecord {
 
   @@unique([userId, workDate])
 }
+
+model AppConfig {
+  id          String   @id
+  companyName String   @default("Company Chat")
+  logoUrl     String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+}

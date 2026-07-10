@@ -16,6 +16,7 @@
   "build": {
     "appId": "vn.lvquy.companychat",
     "productName": "Company Chat",
+    "icon": "../../icon.png",
     "directories": {
       "output": "dist"
     },
@@ -24,13 +25,21 @@
       "preload.js",
       "config.html"
     ],
+    "extraResources": [
+      {
+        "from": "../../icon.png",
+        "to": "icon.png"
+      }
+    ],
     "mac": {
+      "icon": "../../icon.png",
       "category": "public.app-category.business",
       "target": [
         "dmg"
       ]
     },
     "win": {
+      "icon": "../../icon.png",
       "target": [
         "nsis"
       ]

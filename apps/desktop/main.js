@@ -1,4 +1,5 @@
-const { app, BrowserWindow, Menu, ipcMain, dialog, shell, session } = require("electron");
+const { app, BrowserWindow, Menu, Tray, Notification, nativeImage, ipcMain, shell, session } = require("electron");
+const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -6,6 +7,18 @@ const DEFAULT_SERVER_URL =
   process.env.DESKTOP_DEFAULT_SERVER_URL || "http://localhost:3000";
 
 let mainWindow = null;
+let tray = null;
+let isQuitting = false;
+
+function getAppIconPath() {
+  return app.isPackaged
+    ? path.join(process.resourcesPath, "icon.png")
+    : path.resolve(__dirname, "../../icon.png");
+}
+
+function getNotificationBootstrapPath() {
+  return path.join(app.getPath("userData"), "notification-bootstrap.json");
+}
 
 function getConfigPath() {
   return path.join(app.getPath("userData"), "desktop-config.json");
@@ -41,8 +54,6 @@ function readConfig() {
   if (!fs.existsSync(configPath)) {
     return {
       serverUrl: DEFAULT_SERVER_URL,
-      companyName: "Company Chat",
-      logoDataUrl: "",
     };
   }
 
@@ -50,14 +61,10 @@ function readConfig() {
     const data = JSON.parse(fs.readFileSync(configPath, "utf8"));
     return {
       serverUrl: normalizeServerUrl(data.serverUrl) || DEFAULT_SERVER_URL,
-      companyName: String(data.companyName || "Company Chat").trim() || "Company Chat",
-      logoDataUrl: typeof data.logoDataUrl === "string" ? data.logoDataUrl : "",
     };
   } catch {
     return {
       serverUrl: DEFAULT_SERVER_URL,
-      companyName: "Company Chat",
-      logoDataUrl: "",
     };
   }
 }
@@ -70,6 +77,161 @@ function writeConfig(nextConfig) {
 
 function getServerUrl() {
   return readConfig().serverUrl || DEFAULT_SERVER_URL;
+}
+
+function createFallbackTrayIcon() {
+  const svg = `
+    <svg xmlns="http://www.w3.org/2000/svg" width="64" height="64" viewBox="0 0 64 64">
+      <rect x="8" y="8" width="48" height="48" rx="14" fill="#3b77ff"/>
+      <path d="M23 24.5h18a6.5 6.5 0 0 1 6.5 6.5v10A6.5 6.5 0 0 1 41 47.5H31.5l-8.5 6v-22.5A6.5 6.5 0 0 1 29.5 24.5Z" fill="none" stroke="#ffffff" stroke-width="4" stroke-linejoin="round"/>
+    </svg>
+  `;
+  return nativeImage.createFromDataURL(`data:image/svg+xml;base64,${Buffer.from(svg).toString("base64")}`);
+}
+
+function createTrayIcon() {
+  const iconPath = getAppIconPath();
+  if (fs.existsSync(iconPath)) {
+    const icon = nativeImage.createFromPath(iconPath);
+    if (!icon.isEmpty()) {
+      return icon.resize({
+        width: process.platform === "darwin" ? 20 : 24,
+        height: process.platform === "darwin" ? 20 : 24,
+      });
+    }
+  }
+
+  return createFallbackTrayIcon();
+}
+
+function escapeAppleScriptString(value) {
+  return String(value || "")
+    .replace(/\\/g, "\\\\")
+    .replace(/"/g, '\\"')
+    .replace(/\r?\n/g, " ");
+}
+
+function showElectronNotification(payload = {}) {
+  if (!Notification.isSupported()) {
+    return false;
+  }
+
+  const icon = createTrayIcon();
+  const notification = new Notification({
+    title: String(payload.title || "Company Chat"),
+    subtitle: payload.subtitle ? String(payload.subtitle) : undefined,
+    body: String(payload.body || ""),
+    icon,
+    silent: Boolean(payload.silent),
+  });
+
+  notification.on("click", () => {
+    showMainWindow();
+    if (mainWindow && payload.conversationId) {
+      mainWindow.webContents.send("desktop:notification-clicked", {
+        conversationId: String(payload.conversationId),
+      });
+    }
+  });
+
+  notification.show();
+  return true;
+}
+
+function showMacNotification(payload = {}) {
+  const title = escapeAppleScriptString(payload.title || "Company Chat");
+  const body = escapeAppleScriptString(payload.body || "");
+  const subtitle = payload.subtitle
+    ? ` subtitle "${escapeAppleScriptString(payload.subtitle)}"`
+    : "";
+  const script = `display notification "${body}" with title "${title}"${subtitle}`;
+
+  return new Promise((resolve) => {
+    execFile("/usr/bin/osascript", ["-e", script], (error) => {
+      resolve(!error);
+    });
+  });
+}
+
+async function showNativeNotification(payload = {}) {
+  if (process.platform === "darwin") {
+    const delivered = await showMacNotification(payload);
+    if (delivered) {
+      return true;
+    }
+  }
+
+  return showElectronNotification(payload);
+}
+
+function showMainWindow() {
+  if (!mainWindow) {
+    createMainWindow();
+    return;
+  }
+
+  if (mainWindow.isMinimized()) {
+    mainWindow.restore();
+  }
+  mainWindow.show();
+  mainWindow.focus();
+}
+
+function buildTrayMenu() {
+  return Menu.buildFromTemplate([
+    {
+      label: "Mở ứng dụng",
+      click: () => showMainWindow(),
+    },
+    {
+      label: "Tải lại",
+      click: () => {
+        if (mainWindow) {
+          loadChatApp();
+        }
+      },
+    },
+    {
+      label: "Thông báo thử",
+      click: () => {
+        void showNativeNotification({
+          title: "Company Chat",
+          body: "Đây là thông báo thử từ ứng dụng desktop.",
+          silent: false,
+        });
+      },
+    },
+    { type: "separator" },
+    {
+      label: "Thoát",
+      click: () => {
+        isQuitting = true;
+        app.quit();
+      },
+    },
+  ]);
+}
+
+function createTray() {
+  if (tray) {
+    return;
+  }
+
+  tray = new Tray(createTrayIcon());
+  tray.setToolTip("Company Chat");
+  tray.setContextMenu(buildTrayMenu());
+  tray.on("double-click", () => showMainWindow());
+  tray.on("click", () => showMainWindow());
+}
+
+function updateBadgeCount(count) {
+  const safeCount = Math.max(0, Number(count) || 0);
+  if (process.platform === "darwin" && app.dock) {
+    app.dock.setBadge(safeCount > 0 ? String(safeCount) : "");
+  }
+  if (tray) {
+    tray.setToolTip(safeCount > 0 ? `Company Chat (${safeCount} chưa đọc)` : "Company Chat");
+  }
 }
 
 function loadConfigScreen(errorMessage = "", section = "server") {
@@ -92,6 +254,11 @@ async function loadChatApp() {
   const serverUrl = getServerUrl();
 
   try {
+    if (mainWindow?.webContents?.session) {
+      await mainWindow.webContents.session.clearCache().catch(() => {
+        // ignore runtime cache clear failures
+      });
+    }
     await mainWindow.loadURL(serverUrl);
   } catch {
     loadConfigScreen(
@@ -109,6 +276,7 @@ function createMainWindow() {
     title: "Company Chat",
     backgroundColor: "#161a22",
     autoHideMenuBar: false,
+    icon: fs.existsSync(getAppIconPath()) ? getAppIconPath() : undefined,
     webPreferences: {
       preload: path.join(__dirname, "preload.js"),
       contextIsolation: true,
@@ -119,6 +287,14 @@ function createMainWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: "deny" };
+  });
+
+  mainWindow.on("close", (event) => {
+    if (isQuitting) {
+      return;
+    }
+    event.preventDefault();
+    mainWindow.hide();
   });
 
   mainWindow.on("closed", () => {
@@ -140,14 +316,6 @@ function createAppMenu() {
               label: "URL server",
               click: () => loadConfigScreen("", "server"),
             },
-            {
-              label: "Tên công ty",
-              click: () => loadConfigScreen("", "branding"),
-            },
-            {
-              label: "Logo công ty",
-              click: () => loadConfigScreen("", "branding"),
-            },
           ],
         },
         {
@@ -157,6 +325,16 @@ function createAppMenu() {
             if (mainWindow) {
               loadChatApp();
             }
+          },
+        },
+        {
+          label: "Thông báo thử",
+          click: () => {
+            void showNativeNotification({
+              title: "Company Chat",
+              body: "Đây là thông báo thử từ ứng dụng desktop.",
+              silent: false,
+            });
           },
         },
         {
@@ -178,6 +356,14 @@ function createAppMenu() {
 }
 
 app.whenReady().then(() => {
+  if (process.platform === "win32") {
+    app.setAppUserModelId("vn.lvquy.companychat");
+  }
+
+  void session.defaultSession.clearCache().catch(() => {
+    // ignore cache clear failures
+  });
+
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
     if (permission === "notifications") {
       callback(true);
@@ -187,12 +373,29 @@ app.whenReady().then(() => {
   });
 
   createAppMenu();
+  createTray();
   createMainWindow();
 
-  app.on("activate", () => {
-    if (BrowserWindow.getAllWindows().length === 0) {
-      createMainWindow();
+  try {
+    const bootstrapPath = getNotificationBootstrapPath();
+    if (!fs.existsSync(bootstrapPath)) {
+      void showNativeNotification({
+        title: "Company Chat",
+        body: "Ứng dụng đã sẵn sàng nhận thông báo nền.",
+        silent: false,
+      });
+      fs.writeFileSync(bootstrapPath, JSON.stringify({ createdAt: new Date().toISOString() }, null, 2));
     }
+  } catch {
+    // ignore notification bootstrap persistence failures
+  }
+
+  app.on("activate", () => {
+    if (!mainWindow) {
+      createMainWindow();
+      return;
+    }
+    showMainWindow();
   });
 });
 
@@ -211,9 +414,6 @@ ipcMain.handle("desktop:save-config", async (_event, payload) => {
 
   writeConfig({
     serverUrl,
-    companyName:
-      String(payload?.companyName || "").trim() || "Company Chat",
-    logoDataUrl: typeof payload?.logoDataUrl === "string" ? payload.logoDataUrl : "",
   });
   await loadChatApp();
   return { ok: true };
@@ -224,44 +424,29 @@ ipcMain.handle("desktop:reload-chat", async () => {
   return { ok: true };
 });
 
-ipcMain.handle("desktop:pick-logo", async () => {
-  const result = await dialog.showOpenDialog({
-    title: "Chọn logo công ty",
-    properties: ["openFile"],
-    filters: [{ name: "Images", extensions: ["png", "jpg", "jpeg", "webp", "svg"] }],
-  });
-
-  if (result.canceled || result.filePaths.length === 0) {
-    return { ok: false };
-  }
-
-  const filePath = result.filePaths[0];
-  const ext = path.extname(filePath).toLowerCase();
-  const mimeType =
-    ext === ".png"
-      ? "image/png"
-      : ext === ".jpg" || ext === ".jpeg"
-        ? "image/jpeg"
-        : ext === ".webp"
-          ? "image/webp"
-          : ext === ".svg"
-            ? "image/svg+xml"
-            : "application/octet-stream";
-
-  const fileBuffer = fs.readFileSync(filePath);
+ipcMain.handle("desktop:notify", async (_event, payload) => {
   return {
-    ok: true,
-    dataUrl: `data:${mimeType};base64,${fileBuffer.toString("base64")}`,
+    ok: await showNativeNotification(payload),
   };
 });
 
+ipcMain.handle("desktop:set-badge-count", (_event, count) => {
+  updateBadgeCount(count);
+  return { ok: true };
+});
+
 ipcMain.handle("desktop:quit-app", () => {
+  isQuitting = true;
   app.quit();
   return { ok: true };
 });
 
+app.on("before-quit", () => {
+  isQuitting = true;
+});
+
 app.on("window-all-closed", () => {
-  if (process.platform !== "darwin") {
+  if (process.platform !== "darwin" && isQuitting) {
     app.quit();
   }
 });
