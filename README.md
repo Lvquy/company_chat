@@ -157,6 +157,70 @@ docker compose --env-file .env.production -f docker-compose.prod.yml up -d --bui
 docker compose --env-file .env.production -f docker-compose.prod.yml exec backend pnpm prisma migrate deploy
 ```
 
+Hoặc dùng script deploy:
+
+```bash
+cd ~/company_chat
+chmod +x deploy.sh
+./deploy.sh
+```
+
+Nếu muốn script tự `git pull` trước khi deploy:
+
+```bash
+cd ~/company_chat
+PULL_LATEST=1 ./deploy.sh
+```
+
+Nếu muốn nạp thêm seed sau khi migrate:
+
+```bash
+cd ~/company_chat
+RUN_SEED=1 ./deploy.sh
+```
+
+Nếu muốn xóa sạch stack cũ rồi dựng lại từ đầu:
+
+```bash
+cd ~/company_chat
+chmod +x reset.sh
+./reset.sh
+```
+
+Nếu muốn reset sạch và tự `git pull` trước:
+
+```bash
+cd ~/company_chat
+PULL_LATEST=1 ./reset.sh
+```
+
+`reset.sh` sẽ:
+
+- dừng và xóa toàn bộ container của stack
+- xóa volume của stack hiện tại
+- xóa image build nội bộ `company_chat-admin`, `company_chat-backend`
+- dọn Docker cache / image / volume không dùng
+- gọi lại `deploy.sh` để dựng mới hoàn toàn
+
+Có thể tùy chỉnh:
+
+- `PRUNE_VOLUMES=1`: xóa luôn volume dữ liệu stack
+- `PRUNE_GLOBAL_DOCKER=1`: dọn thêm cache Docker toàn hệ thống
+- `RUN_SEED=1`: seed lại dữ liệu mẫu sau deploy
+
+Script hiện tại sẽ:
+
+- build lại stack production
+- chờ `backend` lên trạng thái `running`
+- chạy `pnpm prisma migrate deploy`
+- in `docker compose ps` ở cuối
+
+Có thể tùy chỉnh thêm qua env:
+
+- `ENV_FILE=.env.production`
+- `COMPOSE_FILE=docker-compose.prod.yml`
+- `WAIT_TIMEOUT_SECONDS=180`
+
 Giải thích ngắn:
 
 - `git pull`: lấy code mới nhất

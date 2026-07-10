@@ -7,6 +7,8 @@ export class StorageService implements OnModuleInit {
   private readonly bucket: string;
   private readonly publicBaseUrl: string;
   private readonly fallbackBaseUrl: string;
+  private readonly appOriginBaseUrl: string;
+  private readonly resolvedBaseUrl: string;
 
   constructor() {
     this.bucket = process.env.MINIO_BUCKET ?? 'chat-attachments';
@@ -21,7 +23,11 @@ export class StorageService implements OnModuleInit {
       secretKey: process.env.MINIO_SECRET_KEY ?? 'minioadmin',
     });
     this.publicBaseUrl = (process.env.MINIO_PUBLIC_BASE_URL ?? '').replace(/\/+$/, '');
+    this.appOriginBaseUrl = process.env.APP_ORIGIN
+      ? `${process.env.APP_ORIGIN.replace(/\/+$/, '')}/minio`
+      : '';
     this.fallbackBaseUrl = `${useSSL ? 'https' : 'http'}://${endPoint}${port ? `:${port}` : ''}`;
+    this.resolvedBaseUrl = this.publicBaseUrl || this.appOriginBaseUrl || this.fallbackBaseUrl;
   }
 
   async onModuleInit() {
@@ -79,8 +85,7 @@ export class StorageService implements OnModuleInit {
   }
 
   async getDownloadUrl(key: string) {
-    const base = this.publicBaseUrl || this.fallbackBaseUrl;
-    return `${base}/${this.bucket}/${this.encodeObjectKey(key)}`;
+    return `${this.resolvedBaseUrl}/${this.bucket}/${this.encodeObjectKey(key)}`;
   }
 
   resolveStoredUrl(value?: string | null) {
@@ -91,6 +96,6 @@ export class StorageService implements OnModuleInit {
     if (!storageKey) {
       return value;
     }
-    return `${this.publicBaseUrl || this.fallbackBaseUrl}/${this.bucket}/${this.encodeObjectKey(storageKey)}`;
+    return `${this.resolvedBaseUrl}/${this.bucket}/${this.encodeObjectKey(storageKey)}`;
   }
 }
