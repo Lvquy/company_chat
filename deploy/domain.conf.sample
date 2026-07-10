@@ -1,0 +1,64 @@
+# Nginx host-level config sample
+# Copy file này sang server, ví dụ:
+#   /etc/nginx/conf.d/sample.com.conf
+#
+# Yêu cầu:
+# - Docker stack đang chạy app nội bộ ở 127.0.0.1:8080
+# - Domain sample.com đã trỏ về IP server
+# - Sau khi copy file, chạy:
+#     nginx -t && systemctl reload nginx
+# - Sau đó cấp SSL:
+#     certbot --nginx -d sample.com -d www.sample.com
+
+upstream company_chat_app {
+  server 127.0.0.1:8080;
+  keepalive 32;
+}
+
+server {
+  listen 80;
+  listen [::]:80;
+  server_name sample.com www.sample.com;
+
+  client_max_body_size 100m;
+
+  location / {
+    proxy_pass http://company_chat_app;
+    proxy_http_version 1.1;
+
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+
+    proxy_set_header Upgrade $http_upgrade;
+    proxy_set_header Connection "upgrade";
+  }
+}
+
+# Sau khi certbot cấp SSL xong, có thể dùng block HTTPS thủ công như dưới đây
+# nếu anh không muốn certbot tự sửa file:
+#
+# server {
+#   listen 443 ssl http2;
+#   listen [::]:443 ssl http2;
+#   server_name sample.com www.sample.com;
+#
+#   ssl_certificate /etc/letsencrypt/live/sample.com/fullchain.pem;
+#   ssl_certificate_key /etc/letsencrypt/live/sample.com/privkey.pem;
+#
+#   client_max_body_size 100m;
+#
+#   location / {
+#     proxy_pass http://company_chat_app;
+#     proxy_http_version 1.1;
+#
+#     proxy_set_header Host $host;
+#     proxy_set_header X-Real-IP $remote_addr;
+#     proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+#     proxy_set_header X-Forwarded-Proto $scheme;
+#
+#     proxy_set_header Upgrade $http_upgrade;
+#     proxy_set_header Connection "upgrade";
+#   }
+# }

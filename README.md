@@ -179,6 +179,35 @@ cd ~/company_chat
 RUN_SEED=1 ./deploy.sh
 ```
 
+Nếu chỉ sửa web UI (`apps/admin`):
+
+```bash
+cd ~/company_chat
+./deploy-admin.sh
+```
+
+Nếu chỉ sửa backend/API:
+
+```bash
+cd ~/company_chat
+./deploy-backend.sh
+```
+
+Nếu chỉ sửa nginx trong Docker:
+
+```bash
+cd ~/company_chat
+./deploy-nginx.sh
+```
+
+Cả 3 script trên đều hỗ trợ:
+
+```bash
+PULL_LATEST=1 ./deploy-admin.sh
+PULL_LATEST=1 ./deploy-backend.sh
+PULL_LATEST=1 ./deploy-nginx.sh
+```
+
 Nếu muốn xóa sạch stack cũ rồi dựng lại từ đầu:
 
 ```bash

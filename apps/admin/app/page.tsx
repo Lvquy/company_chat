@@ -722,6 +722,21 @@ function QuitIcon() {
   );
 }
 
+function DownloadIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path
+        d="M12 4.75v9.5m0 0 3.5-3.5m-3.5 3.5-3.5-3.5M5.75 17.25h12.5"
+        fill="none"
+        stroke="currentColor"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        strokeWidth="1.8"
+      />
+    </svg>
+  );
+}
+
 export default function HomePage() {
   const socketRef = useRef<Socket | null>(null);
   const messageStreamRef = useRef<HTMLDivElement | null>(null);
@@ -1182,10 +1197,7 @@ export default function HomePage() {
     });
   }, [deferredSearch, directory]);
 
-  const recentAttachments = useMemo(
-    () => messages.flatMap((message) => message.attachments).slice(-6).reverse(),
-    [messages],
-  );
+  const recentAttachments = useMemo(() => messages.flatMap((message) => message.attachments).reverse(), [messages]);
 
   const mentionCandidates = useMemo(() => {
     const query = getMentionQuery(messageBody);
@@ -1204,17 +1216,6 @@ export default function HomePage() {
       .filter((user) => user.fullName.toLowerCase().includes(query) || user.username.toLowerCase().includes(query))
       .slice(0, 5);
   }, [currentUser?.id, directory, messageBody, selectedConversation]);
-
-  const sharedGroupCount = useMemo(() => {
-    if (!selectedConversation || selectedConversation.type !== 'DIRECT') return 0;
-    const peerId = selectedConversation.members.find((member) => member.user.id !== currentUser?.id)?.user.id;
-    if (!peerId) return 0;
-    return conversations.filter(
-      (conversation) =>
-        conversation.type === 'GROUP' &&
-        conversation.members.some((member) => member.user.id === peerId),
-    ).length;
-  }, [conversations, currentUser?.id, selectedConversation]);
 
   const groupCandidates = useMemo(() => {
     const query = groupSearch.trim().toLowerCase();
@@ -3417,15 +3418,6 @@ export default function HomePage() {
                 </div>
               </section>
 
-              {selectedConversation?.type !== 'GROUP' ? (
-                <section className="detail-card detail-card-dark">
-                  <div className="detail-row">
-                    <span>Nhóm chung</span>
-                    <strong>{sharedGroupCount}</strong>
-                  </div>
-                </section>
-              ) : null}
-
               {selectedConversation?.type === 'GROUP' ? (
                 <section className="detail-card detail-card-dark">
                   <div className="group-manage-header">
@@ -3479,31 +3471,27 @@ export default function HomePage() {
               ) : null}
 
               <section className="detail-card detail-card-dark">
-                <h3>Ảnh / Video</h3>
-                <div className="attachment-grid">
-                  {recentAttachments.length ? (
-                    recentAttachments.map((item) => (
-                      <div className="attachment-tile" key={item.attachment.id}>
-                        <span>{item.attachment.originalName.slice(0, 18)}</span>
-                      </div>
-                    ))
-                  ) : (
-                    <div className="attachment-empty">Chưa có file đính kèm</div>
-                  )}
-                </div>
-              </section>
-
-              <section className="detail-card detail-card-dark">
                 <h3>File</h3>
                 <div className="file-list">
                   {recentAttachments.length ? (
-                    recentAttachments.slice(0, 3).map((item) => (
+                    recentAttachments.map((item) => (
                       <div className="file-row" key={item.attachment.id}>
                         <div className="file-icon">{item.attachment.originalName[0]}</div>
-                        <div>
+                        <div className="file-row-copy">
                           <strong>{item.attachment.originalName}</strong>
                           <span>{item.attachment.mimeType}</span>
                         </div>
+                        <a
+                          className="file-download-button"
+                          href={item.attachment.downloadUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          download={item.attachment.originalName}
+                          aria-label={`Tải ${item.attachment.originalName}`}
+                          title="Tải xuống"
+                        >
+                          <DownloadIcon />
+                        </a>
                       </div>
                     ))
                   ) : (
