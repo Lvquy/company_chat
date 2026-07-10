@@ -199,14 +199,18 @@ PULL_LATEST=1 ./reset.sh
 - dừng và xóa toàn bộ container của stack
 - xóa volume của stack hiện tại
 - xóa image build nội bộ `company_chat-admin`, `company_chat-backend`
+- xóa artifact build trong source: `.next`, `dist`, `node_modules`
+- xóa `.env.production` và copy lại từ `.env.production.example`
 - dọn Docker cache / image / volume không dùng
 - gọi lại `deploy.sh` để dựng mới hoàn toàn
+- mặc định chạy luôn `seed`
 
 Có thể tùy chỉnh:
 
 - `PRUNE_VOLUMES=1`: xóa luôn volume dữ liệu stack
 - `PRUNE_GLOBAL_DOCKER=1`: dọn thêm cache Docker toàn hệ thống
 - `RUN_SEED=1`: seed lại dữ liệu mẫu sau deploy
+- `SAMPLE_ENV_FILE=.env.production.example`: file mẫu env để copy lại
 
 Script hiện tại sẽ:
 
