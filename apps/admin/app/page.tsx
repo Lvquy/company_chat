@@ -33,7 +33,7 @@ declare global {
   interface Window {
     desktopApp?: {
       getConfig: () => Promise<DesktopConfig>;
-      notify?: (payload: { title: string; body: string; conversationId?: string }) => Promise<{ ok: boolean }>;
+      notify?: (payload: { title: string; subtitle?: string; body: string; conversationId?: string }) => Promise<{ ok: boolean }>;
       setBadgeCount?: (count: number) => Promise<{ ok: boolean }>;
       onNotificationClick?: (callback: (payload: { conversationId?: string }) => void) => () => void;
       quitApp?: () => Promise<{ ok: boolean }>;
@@ -833,6 +833,15 @@ export default function HomePage() {
   });
 
   useEffect(() => {
+    if (!adminNotice) {
+      return;
+    }
+
+    const timeoutId = window.setTimeout(() => setAdminNotice(null), 3000);
+    return () => window.clearTimeout(timeoutId);
+  }, [adminNotice]);
+
+  useEffect(() => {
     const hasDesktopBridge = Boolean(window.desktopApp);
     const isElectronRuntime =
       typeof navigator !== 'undefined' && /electron/i.test(navigator.userAgent);
@@ -1094,11 +1103,6 @@ export default function HomePage() {
         ? getConversationTitle(conversation, currentUser.id)
         : message.sender.fullName;
       const body = message.body?.trim() || 'Đã gửi một file đính kèm';
-      const isMacDesktop =
-        typeof navigator !== 'undefined' &&
-        /mac/i.test(navigator.platform) &&
-        (Boolean(window.desktopApp) || /electron/i.test(navigator.userAgent));
-
       playIncomingNotificationSound();
 
       if (!isActiveConversation || !isVisible) {
@@ -1109,7 +1113,14 @@ export default function HomePage() {
       }
 
       if (!isActiveConversation || !isVisible) {
-        if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
+        if (window.desktopApp?.notify) {
+          void window.desktopApp.notify({
+            title: appBranding.companyName,
+            subtitle: title,
+            body,
+            conversationId: message.conversationId,
+          });
+        } else if (typeof window !== 'undefined' && 'Notification' in window && Notification.permission === 'granted') {
           const notification = new Notification(title, {
             body,
             icon: message.sender.avatarUrl ?? undefined,
@@ -1119,14 +1130,6 @@ export default function HomePage() {
             window.focus();
             openConversation(message.conversationId);
           };
-        }
-
-        if (window.desktopApp?.notify && !isMacDesktop) {
-          void window.desktopApp.notify({
-            title,
-            body,
-            conversationId: message.conversationId,
-          });
         }
       }
     });

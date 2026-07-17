@@ -1,5 +1,4 @@
 const { app, BrowserWindow, Menu, Tray, Notification, nativeImage, ipcMain, shell, session } = require("electron");
-const { execFile } = require("child_process");
 const fs = require("fs");
 const path = require("path");
 
@@ -9,6 +8,8 @@ const DEFAULT_SERVER_URL =
 let mainWindow = null;
 let tray = null;
 let isQuitting = false;
+
+app.setName("Company Chat");
 
 function getAppIconPath() {
   return app.isPackaged
@@ -104,13 +105,6 @@ function createTrayIcon() {
   return createFallbackTrayIcon();
 }
 
-function escapeAppleScriptString(value) {
-  return String(value || "")
-    .replace(/\\/g, "\\\\")
-    .replace(/"/g, '\\"')
-    .replace(/\r?\n/g, " ");
-}
-
 function showElectronNotification(payload = {}) {
   if (!Notification.isSupported()) {
     return false;
@@ -138,29 +132,7 @@ function showElectronNotification(payload = {}) {
   return true;
 }
 
-function showMacNotification(payload = {}) {
-  const title = escapeAppleScriptString(payload.title || "Company Chat");
-  const body = escapeAppleScriptString(payload.body || "");
-  const subtitle = payload.subtitle
-    ? ` subtitle "${escapeAppleScriptString(payload.subtitle)}"`
-    : "";
-  const script = `display notification "${body}" with title "${title}"${subtitle}`;
-
-  return new Promise((resolve) => {
-    execFile("/usr/bin/osascript", ["-e", script], (error) => {
-      resolve(!error);
-    });
-  });
-}
-
-async function showNativeNotification(payload = {}) {
-  if (process.platform === "darwin") {
-    const delivered = await showMacNotification(payload);
-    if (delivered) {
-      return true;
-    }
-  }
-
+function showNativeNotification(payload = {}) {
   return showElectronNotification(payload);
 }
 
@@ -356,6 +328,11 @@ function createAppMenu() {
 }
 
 app.whenReady().then(() => {
+  const appIconPath = getAppIconPath();
+  if (process.platform === "darwin" && app.dock && fs.existsSync(appIconPath)) {
+    app.dock.setIcon(appIconPath);
+  }
+
   if (process.platform === "win32") {
     app.setAppUserModelId("vn.lvquy.companychat");
   }
