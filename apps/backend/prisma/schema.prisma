@@ -31,6 +31,20 @@ enum MessageType {
   SYSTEM
 }
 
+enum CallStatus {
+  RINGING
+  ACTIVE
+  DECLINED
+  CANCELLED
+  ENDED
+  MISSED
+}
+
+enum CallKind {
+  AUDIO
+  VIDEO
+}
+
 model Department {
   id          String             @id @default(cuid())
   name        String             @unique
@@ -58,6 +72,8 @@ model User {
   reactions        MessageReaction[]
   loginActivities  LoginActivity[]
   attendanceLogs   AttendanceRecord[]
+  initiatedCalls   Call[]              @relation("CallInitiator")
+  receivedCalls    Call[]              @relation("CallRecipient")
 }
 
 model DepartmentMember {
@@ -82,6 +98,7 @@ model Conversation {
   lastMessageAt  DateTime?
   members        ConversationMember[]
   messages       Message[]
+  calls          Call[]
 }
 
 model ConversationMember {
@@ -185,6 +202,26 @@ model AttendanceRecord {
   user             User     @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workDate])
+}
+
+model Call {
+  id             String     @id @default(cuid())
+  conversationId String
+  initiatorId    String
+  recipientId    String
+  roomName       String     @unique
+  kind           CallKind   @default(AUDIO)
+  status         CallStatus @default(RINGING)
+  createdAt      DateTime   @default(now())
+  answeredAt     DateTime?
+  endedAt        DateTime?
+  conversation   Conversation @relation(fields: [conversationId], references: [id], onDelete: Cascade)
+  initiator      User       @relation("CallInitiator", fields: [initiatorId], references: [id], onDelete: Restrict)
+  recipient      User       @relation("CallRecipient", fields: [recipientId], references: [id], onDelete: Restrict)
+
+  @@index([conversationId, createdAt])
+  @@index([recipientId, status])
+  @@index([initiatorId, status])
 }
 
 model AppConfig {

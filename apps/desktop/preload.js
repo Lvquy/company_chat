@@ -5,6 +5,7 @@ contextBridge.exposeInMainWorld("desktopApp", {
   saveConfig: (payload) => ipcRenderer.invoke("desktop:save-config", payload),
   reloadChat: () => ipcRenderer.invoke("desktop:reload-chat"),
   notify: (payload) => ipcRenderer.invoke("desktop:notify", payload),
+  requestMediaAccess: (kind) => ipcRenderer.invoke("desktop:request-media-access", kind),
   setBadgeCount: (count) => ipcRenderer.invoke("desktop:set-badge-count", count),
   onNotificationClick: (callback) => {
     const listener = (_event, payload) => callback(payload);

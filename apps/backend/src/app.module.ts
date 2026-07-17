@@ -11,6 +11,8 @@ import { AuthController } from './auth.controller';
 import { AuthGuard } from './auth.guard';
 import { AuthService } from './auth.service';
 import { ChatGateway } from './chat.gateway';
+import { CallsController } from './calls.controller';
+import { CallsService } from './calls.service';
 import { ConversationsController } from './conversations.controller';
 import { ConversationsService } from './conversations.service';
 import { DepartmentsController } from './departments.controller';
@@ -18,6 +20,7 @@ import { DepartmentsService } from './departments.service';
 import { PrismaService } from './prisma.service';
 import { SetupController } from './setup.controller';
 import { StorageService } from './storage.service';
+import { LiveKitService } from './livekit.service';
 import { UsersController } from './users.controller';
 import { UsersService } from './users.service';
 
@@ -38,6 +41,7 @@ import { UsersService } from './users.service';
     DepartmentsController,
     ConversationsController,
     AttachmentsController,
+    CallsController,
   ],
   providers: [
     AppService,
@@ -51,6 +55,8 @@ import { UsersService } from './users.service';
     UsersService,
     DepartmentsService,
     ConversationsService,
+    CallsService,
+    LiveKitService,
   ],
 })
 export class AppModule {}

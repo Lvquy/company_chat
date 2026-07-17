@@ -11,6 +11,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { Room, RoomEvent, Track } from 'livekit-client';
 import { io, Socket } from 'socket.io-client';
 
 const API_BASE = process.env.NEXT_PUBLIC_API_BASE ?? 'http://localhost:3001';
@@ -29,11 +30,18 @@ type AppBranding = {
   logoUrl: string;
 };
 
+type MediaPermissionResult = {
+  camera: boolean;
+  microphone: boolean;
+  settingsOpened: boolean;
+};
+
 declare global {
   interface Window {
     desktopApp?: {
       getConfig: () => Promise<DesktopConfig>;
       notify?: (payload: { title: string; subtitle?: string; body: string; conversationId?: string }) => Promise<{ ok: boolean }>;
+      requestMediaAccess?: (kind: 'audio' | 'video') => Promise<MediaPermissionResult>;
       setBadgeCount?: (count: number) => Promise<{ ok: boolean }>;
       onNotificationClick?: (callback: (payload: { conversationId?: string }) => void) => () => void;
       quitApp?: () => Promise<{ ok: boolean }>;
@@ -150,6 +158,28 @@ type AttachmentResponse = {
   id: string;
   originalName: string;
   downloadUrl: string;
+};
+
+type CallStatus = 'RINGING' | 'ACTIVE' | 'DECLINED' | 'CANCELLED' | 'ENDED' | 'MISSED';
+
+type VoiceCall = {
+  id: string;
+  conversationId: string;
+  initiatorId: string;
+  recipientId: string;
+  roomName: string;
+  kind: 'AUDIO' | 'VIDEO';
+  status: CallStatus;
+  createdAt: string;
+  answeredAt?: string | null;
+  endedAt?: string | null;
+  initiator: { id: string; fullName: string; username: string; avatarUrl?: string | null };
+  recipient: { id: string; fullName: string; username: string; avatarUrl?: string | null };
+};
+
+type LiveKitCredentials = {
+  url: string;
+  token: string;
 };
 
 type AdminUser = {
@@ -737,6 +767,31 @@ function DownloadIcon() {
   );
 }
 
+function PhoneIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M7.2 3.8 4.9 5.2c-.8.5-1.1 1.5-.8 2.4 1.5 4.5 5.1 8.1 9.6 9.6.9.3 1.9 0 2.4-.8l1.4-2.3c.4-.7.3-1.6-.3-2.1l-2.2-1.8c-.6-.5-1.5-.5-2.1-.1l-1.3.9a11.3 11.3 0 0 1-2.7-2.7l.9-1.3c.4-.6.4-1.5-.1-2.1L9.3 4.1c-.5-.6-1.4-.7-2.1-.3Z" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function VideoIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M5.8 6.5h8.4A1.8 1.8 0 0 1 16 8.3v7.4a1.8 1.8 0 0 1-1.8 1.8H5.8A1.8 1.8 0 0 1 4 15.7V8.3a1.8 1.8 0 0 1 1.8-1.8Zm10.2 4 3.2-2.1c.7-.5 1.8 0 1.8.9v5.4c0 .9-1.1 1.4-1.8.9L16 13.5" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+    </svg>
+  );
+}
+
+function MicIcon({ muted = false }: { muted?: boolean }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true">
+      <path d="M12 4.2a2.7 2.7 0 0 0-2.7 2.7v4.2a2.7 2.7 0 1 0 5.4 0V6.9A2.7 2.7 0 0 0 12 4.2Zm-5 6.4a5 5 0 0 0 10 0M12 15.6v3.2m-3 0h6" fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" />
+      {muted ? <path d="m4.5 4.5 15 15" fill="none" stroke="currentColor" strokeLinecap="round" strokeWidth="2" /> : null}
+    </svg>
+  );
+}
+
 export default function HomePage() {
   const socketRef = useRef<Socket | null>(null);
   const messageStreamRef = useRef<HTMLDivElement | null>(null);
@@ -744,6 +799,11 @@ export default function HomePage() {
   const messageItemRefs = useRef<Record<string, HTMLDivElement | null>>({});
   const reactionHoverTimeoutRef = useRef<number | null>(null);
   const actionHoverTimeoutRef = useRef<number | null>(null);
+  const callRoomRef = useRef<Room | null>(null);
+  const callAudioElementsRef = useRef<HTMLMediaElement[]>([]);
+  const callVideoStageRef = useRef<HTMLDivElement | null>(null);
+  const callLocalVideoElementsRef = useRef<HTMLMediaElement[]>([]);
+  const callRemoteVideoElementsRef = useRef<HTMLMediaElement[]>([]);
   const settingsMenuRef = useRef<HTMLDivElement | null>(null);
   const selectedConversationRef = useRef('');
   const conversationsRef = useRef<Conversation[]>([]);
@@ -798,6 +858,12 @@ export default function HomePage() {
     companyName: 'Company Chat',
     logoUrl: '',
   });
+  const [incomingCall, setIncomingCall] = useState<VoiceCall | null>(null);
+  const [activeCall, setActiveCall] = useState<VoiceCall | null>(null);
+  const [isCallConnecting, setIsCallConnecting] = useState(false);
+  const [isCallMicEnabled, setIsCallMicEnabled] = useState(true);
+  const [isCallCameraEnabled, setIsCallCameraEnabled] = useState(true);
+  const [needsMediaPermission, setNeedsMediaPermission] = useState(false);
 
   const [loginForm, setLoginForm] = useState({
     username: '',
@@ -935,6 +1001,12 @@ export default function HomePage() {
     });
 
     return cleanup;
+  }, []);
+
+  useEffect(() => {
+    return () => {
+      void disconnectAudioCall();
+    };
   }, []);
 
   useEffect(() => {
@@ -1132,6 +1204,28 @@ export default function HomePage() {
           };
         }
       }
+    });
+
+    socket.on('call:incoming', (call: VoiceCall) => {
+      if (call.initiatorId === currentUser.id) {
+        setActiveCall(call);
+        return;
+      }
+
+      setIncomingCall(call);
+      playIncomingNotificationSound();
+      if (window.desktopApp?.notify) {
+        void window.desktopApp.notify({
+          title: appBranding.companyName,
+          subtitle: call.kind === 'VIDEO' ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến',
+          body: `${call.initiator.fullName} đang gọi cho bạn`,
+          conversationId: call.conversationId,
+        });
+      }
+    });
+
+    socket.on('call:updated', (call: VoiceCall) => {
+      void handleCallUpdate(call);
     });
 
     return () => {
@@ -1423,6 +1517,239 @@ export default function HomePage() {
     const message = handleApiError(err);
     setNotice(null);
     setError(message);
+  }
+
+  function clearCallAudio() {
+    callAudioElementsRef.current.forEach((element) => element.remove());
+    callAudioElementsRef.current = [];
+  }
+
+  function clearCallVideo(localOnly = false) {
+    callLocalVideoElementsRef.current.forEach((element) => element.remove());
+    callLocalVideoElementsRef.current = [];
+    if (!localOnly) {
+      callRemoteVideoElementsRef.current.forEach((element) => element.remove());
+      callRemoteVideoElementsRef.current = [];
+    }
+  }
+
+  function attachCallVideo(track: Track, local: boolean) {
+    const stage = callVideoStageRef.current;
+    if (!stage) return;
+    const element = track.attach() as HTMLVideoElement;
+    element.autoplay = true;
+    element.playsInline = true;
+    element.className = local ? 'call-video local' : 'call-video remote';
+    stage.appendChild(element);
+    (local ? callLocalVideoElementsRef.current : callRemoteVideoElementsRef.current).push(element);
+  }
+
+  async function disconnectAudioCall() {
+    const room = callRoomRef.current;
+    callRoomRef.current = null;
+    if (room) {
+      await room.disconnect();
+    }
+    clearCallAudio();
+    clearCallVideo();
+    setIsCallMicEnabled(true);
+    setIsCallCameraEnabled(true);
+  }
+
+  async function connectAudioCall(call: VoiceCall) {
+    if (callRoomRef.current) return;
+
+    setIsCallConnecting(true);
+    try {
+      const credentials = await api<LiveKitCredentials>(`/calls/${call.id}/join`, token, {
+        method: 'POST',
+      });
+      const room = new Room();
+      callRoomRef.current = room;
+
+      room.on(RoomEvent.TrackSubscribed, (track) => {
+        if (track.kind === Track.Kind.Audio) {
+          const element = track.attach();
+          element.autoplay = true;
+          document.body.appendChild(element);
+          callAudioElementsRef.current.push(element);
+          return;
+        }
+        if (track.kind === Track.Kind.Video) {
+          attachCallVideo(track, false);
+        }
+      });
+      room.on(RoomEvent.Disconnected, () => {
+        clearCallAudio();
+        clearCallVideo();
+      });
+
+      await room.connect(credentials.url, credentials.token);
+      await room.localParticipant.setMicrophoneEnabled(true);
+      if (call.kind === 'VIDEO') {
+        await room.localParticipant.setCameraEnabled(true);
+        const localCamera = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+        if (localCamera) {
+          attachCallVideo(localCamera, true);
+        }
+      }
+      setActiveCall(call);
+      setIsCallMicEnabled(true);
+      setIsCallCameraEnabled(call.kind === 'VIDEO');
+    } catch (err) {
+      await disconnectAudioCall();
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setError(
+          call.kind === 'VIDEO'
+            ? 'Không thể mở camera hoặc microphone. Hãy cấp quyền cho ứng dụng rồi thử lại.'
+            : 'Không thể mở microphone. Hãy cấp quyền cho ứng dụng rồi thử lại.',
+        );
+      } else {
+        handleGlobalApiError(err);
+      }
+    } finally {
+      setIsCallConnecting(false);
+    }
+  }
+
+  async function handleCallUpdate(call: VoiceCall) {
+    if (call.status === 'ACTIVE') {
+      setIncomingCall((current) => (current?.id === call.id ? null : current));
+      setActiveCall(call);
+      await connectAudioCall(call);
+      return;
+    }
+
+    if (['DECLINED', 'CANCELLED', 'ENDED', 'MISSED'].includes(call.status)) {
+      setIncomingCall((current) => (current?.id === call.id ? null : current));
+      setActiveCall((current) => (current?.id === call.id ? null : current));
+      await disconnectAudioCall();
+    }
+  }
+
+  async function startVoiceCall(kind: 'AUDIO' | 'VIDEO' = 'AUDIO') {
+    if (!selectedConversation || selectedConversation.type !== 'DIRECT') {
+      setError('Chỉ có thể gọi thoại trong cuộc trò chuyện 1–1');
+      return;
+    }
+
+    setBusy('voice-call-start');
+    try {
+      setNeedsMediaPermission(false);
+      if (window.desktopApp?.requestMediaAccess) {
+        const permission = await window.desktopApp.requestMediaAccess(kind === 'VIDEO' ? 'video' : 'audio');
+        if (!permission.microphone || (kind === 'VIDEO' && !permission.camera)) {
+          setNeedsMediaPermission(true);
+          throw new Error(
+            kind === 'VIDEO'
+              ? 'Cần cấp quyền camera và microphone trước khi gọi video.'
+              : 'Cần cấp quyền microphone trước khi gọi thoại.',
+          );
+        }
+      }
+      if (!navigator.mediaDevices?.getUserMedia) {
+        throw new Error('Trình duyệt hiện tại không hỗ trợ gọi thoại/video');
+      }
+      const permissionStream = await navigator.mediaDevices.getUserMedia({
+        audio: true,
+        video: kind === 'VIDEO',
+      });
+      permissionStream.getTracks().forEach((track) => track.stop());
+
+      const call = await api<VoiceCall>('/calls', token, {
+        method: 'POST',
+        body: JSON.stringify({ conversationId: selectedConversation.id, kind }),
+      });
+      setActiveCall(call);
+    } catch (err) {
+      if (err instanceof DOMException && err.name === 'NotAllowedError') {
+        setNeedsMediaPermission(true);
+        setError(
+          kind === 'VIDEO'
+            ? 'Cần cấp quyền camera và microphone trước khi gọi video.'
+            : 'Cần cấp quyền microphone trước khi gọi thoại.',
+        );
+      } else {
+        handleGlobalApiError(err);
+      }
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function acceptIncomingCall() {
+    if (!incomingCall) return;
+    setBusy('voice-call-accept');
+    try {
+      const call = await api<VoiceCall>(`/calls/${incomingCall.id}/accept`, token, { method: 'POST' });
+      await handleCallUpdate(call);
+    } catch (err) {
+      handleGlobalApiError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function declineIncomingCall() {
+    if (!incomingCall) return;
+    setBusy('voice-call-decline');
+    try {
+      await api<VoiceCall>(`/calls/${incomingCall.id}/decline`, token, { method: 'POST' });
+      setIncomingCall(null);
+    } catch (err) {
+      handleGlobalApiError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function endVoiceCall() {
+    const call = activeCall ?? incomingCall;
+    if (!call) return;
+    setBusy('voice-call-end');
+    try {
+      await api<VoiceCall>(`/calls/${call.id}/end`, token, { method: 'POST' });
+      await disconnectAudioCall();
+      setActiveCall(null);
+      setIncomingCall(null);
+    } catch (err) {
+      handleGlobalApiError(err);
+    } finally {
+      setBusy(null);
+    }
+  }
+
+  async function toggleCallMicrophone() {
+    const room = callRoomRef.current;
+    if (!room) return;
+    const nextEnabled = !isCallMicEnabled;
+    await room.localParticipant.setMicrophoneEnabled(nextEnabled);
+    setIsCallMicEnabled(nextEnabled);
+  }
+
+  async function toggleCallCamera() {
+    const room = callRoomRef.current;
+    if (!room || activeCall?.kind !== 'VIDEO') return;
+    const nextEnabled = !isCallCameraEnabled;
+    await room.localParticipant.setCameraEnabled(nextEnabled);
+    clearCallVideo(true);
+    if (nextEnabled) {
+      const localCamera = room.localParticipant.getTrackPublication(Track.Source.Camera)?.track;
+      if (localCamera) {
+        attachCallVideo(localCamera, true);
+      }
+    }
+    setIsCallCameraEnabled(nextEnabled);
+  }
+
+  async function requestCallMediaPermission() {
+    if (!window.desktopApp?.requestMediaAccess) return;
+    const kind = activeCall?.kind === 'VIDEO' || incomingCall?.kind === 'VIDEO' ? 'video' : 'audio';
+    const permission = await window.desktopApp.requestMediaAccess(kind);
+    if (permission.microphone && (kind !== 'video' || permission.camera)) {
+      setNeedsMediaPermission(false);
+      setError(null);
+    }
   }
 
   function pushAdminNotice(message: string) {
@@ -2128,6 +2455,94 @@ export default function HomePage() {
 
   return (
     <main className="app-screen">
+      {incomingCall ? (
+        <div className="call-overlay" role="dialog" aria-modal="true" aria-label="Cuộc gọi đến">
+          <section className="call-card incoming-call-card">
+            <span className="call-eyebrow">{incomingCall.kind === 'VIDEO' ? 'Cuộc gọi video đến' : 'Cuộc gọi thoại đến'}</span>
+            <Avatar avatarUrl={incomingCall.initiator.avatarUrl} name={incomingCall.initiator.fullName} size="lg" />
+            <strong>{incomingCall.initiator.fullName}</strong>
+            <span>đang gọi cho bạn</span>
+            <div className="call-actions">
+              <button
+                type="button"
+                className="call-action decline"
+                disabled={busy === 'voice-call-decline'}
+                onClick={() => void declineIncomingCall()}
+              >
+                <PhoneIcon />
+                <span>Từ chối</span>
+              </button>
+              <button
+                type="button"
+                className="call-action accept"
+                disabled={busy === 'voice-call-accept'}
+                onClick={() => void acceptIncomingCall()}
+              >
+                <PhoneIcon />
+                <span>{busy === 'voice-call-accept' ? 'Đang kết nối...' : 'Nhận cuộc gọi'}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
+      {activeCall ? (
+        <div className="call-overlay" role="dialog" aria-modal="true" aria-label="Cuộc gọi thoại">
+          <section className="call-card active-call-card">
+            <span className="call-eyebrow">
+              {activeCall.status === 'RINGING'
+                ? `Đang gọi ${activeCall.kind === 'VIDEO' ? 'video' : 'thoại'}...`
+                : isCallConnecting
+                  ? 'Đang kết nối...'
+                  : activeCall.kind === 'VIDEO'
+                    ? 'Cuộc gọi video'
+                    : 'Cuộc gọi thoại'}
+            </span>
+            {activeCall.kind === 'VIDEO' ? <div ref={callVideoStageRef} className="call-video-stage" /> : null}
+            <Avatar
+              avatarUrl={(activeCall.initiatorId === currentUser.id ? activeCall.recipient : activeCall.initiator).avatarUrl}
+              name={(activeCall.initiatorId === currentUser.id ? activeCall.recipient : activeCall.initiator).fullName}
+              size="lg"
+            />
+            <strong>{(activeCall.initiatorId === currentUser.id ? activeCall.recipient : activeCall.initiator).fullName}</strong>
+            <span>{activeCall.status === 'RINGING' ? 'Đang chờ người nhận...' : 'Đã kết nối'}</span>
+            <div className="call-actions">
+              {activeCall.status === 'ACTIVE' ? (
+                <button
+                  type="button"
+                  className={isCallMicEnabled ? 'call-action secondary' : 'call-action secondary active'}
+                  onClick={() => void toggleCallMicrophone()}
+                  aria-label={isCallMicEnabled ? 'Tắt mic' : 'Bật mic'}
+                >
+                  <MicIcon muted={!isCallMicEnabled} />
+                  <span>{isCallMicEnabled ? 'Tắt mic' : 'Bật mic'}</span>
+                </button>
+              ) : null}
+              {activeCall.status === 'ACTIVE' && activeCall.kind === 'VIDEO' ? (
+                <button
+                  type="button"
+                  className={isCallCameraEnabled ? 'call-action secondary' : 'call-action secondary active'}
+                  onClick={() => void toggleCallCamera()}
+                  aria-label={isCallCameraEnabled ? 'Tắt camera' : 'Bật camera'}
+                >
+                  <VideoIcon />
+                  <span>{isCallCameraEnabled ? 'Tắt camera' : 'Bật camera'}</span>
+                </button>
+              ) : null}
+              <button
+                type="button"
+                className="call-action decline"
+                disabled={busy === 'voice-call-end'}
+                onClick={() => void endVoiceCall()}
+              >
+                <PhoneIcon />
+                <span>{activeCall.status === 'RINGING' ? 'Hủy cuộc gọi' : 'Kết thúc'}</span>
+              </button>
+            </div>
+          </section>
+        </div>
+      ) : null}
+
       {showGroupModal ? (
         <div className="modal-backdrop" onClick={() => setShowGroupModal(false)}>
           <div className="modal-card" onClick={(event) => event.stopPropagation()}>
@@ -3029,52 +3444,44 @@ export default function HomePage() {
                 </div>
                 {selectedConversation ? (
                   <div className="chat-toolbar">
-                    <label className="chat-toolbar-field chat-toolbar-date">
-                      <CalendarIcon />
-                      <input
-                        type="date"
-                        value={conversationDateFilter}
-                        onChange={(event) => setConversationDateFilter(event.target.value)}
-                      />
-                      {conversationDateFilter ? (
+                    {selectedConversation.type === 'DIRECT' ? (
+                      <>
                         <button
                           type="button"
-                          className="chat-toolbar-clear"
-                          onClick={() => setConversationDateFilter('')}
-                          aria-label="Xóa lọc ngày"
+                          className="chat-call-button"
+                          aria-label="Gọi thoại"
+                          title="Gọi thoại"
+                          disabled={Boolean(activeCall || incomingCall) || busy === 'voice-call-start'}
+                          onClick={() => void startVoiceCall()}
                         >
-                          <ClearIcon />
+                          <PhoneIcon />
                         </button>
-                      ) : null}
-                    </label>
-                    <label className="chat-toolbar-field chat-toolbar-search">
-                      <SearchIcon />
-                      <input
-                        type="search"
-                        placeholder="Tìm tin nhắn"
-                        value={conversationSearch}
-                        onChange={(event) => setConversationSearch(event.target.value)}
-                      />
-                      {deferredConversationSearch.trim() ? (
-                        <span className="chat-search-count">
-                          {matchedMessageIds.length ? `${activeConversationSearchIndex + 1}/${matchedMessageIds.length}` : '0'}
-                        </span>
-                      ) : null}
-                      <button
-                        type="button"
-                        className="chat-toolbar-next"
-                        onClick={gotoNextSearchResult}
-                        disabled={!matchedMessageIds.length}
-                        aria-label="Kết quả tiếp theo"
-                      >
-                        <NextIcon />
-                      </button>
-                    </label>
+                        <button
+                          type="button"
+                          className="chat-call-button"
+                          aria-label="Gọi video"
+                          title="Gọi video"
+                          disabled={Boolean(activeCall || incomingCall) || busy === 'voice-call-start'}
+                          onClick={() => void startVoiceCall('VIDEO')}
+                        >
+                          <VideoIcon />
+                        </button>
+                      </>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
 
-              {error ? <div className="error-banner inline">{error}</div> : null}
+              {error ? (
+                <div className="error-banner inline call-permission-error">
+                  <span>{error}</span>
+                  {needsMediaPermission && window.desktopApp?.requestMediaAccess ? (
+                    <button type="button" onClick={() => void requestCallMediaPermission()}>
+                      Mở cài đặt quyền
+                    </button>
+                  ) : null}
+                </div>
+              ) : null}
               {notice ? <div className="notice-banner">{notice}</div> : null}
 
               <div ref={messageStreamRef} className="message-stream zalo-message-stream">
@@ -3405,6 +3812,51 @@ export default function HomePage() {
 
             <aside className="detail-column zalo-dark-panel detail-sidebar">
               <div className="detail-sidebar-header">Thông tin hội thoại</div>
+
+              <section className="detail-card detail-card-dark conversation-filter-card">
+                <h3>Tìm trong hội thoại</h3>
+                <label className="chat-toolbar-field chat-toolbar-date">
+                  <CalendarIcon />
+                  <input
+                    type="date"
+                    value={conversationDateFilter}
+                    onChange={(event) => setConversationDateFilter(event.target.value)}
+                  />
+                  {conversationDateFilter ? (
+                    <button
+                      type="button"
+                      className="chat-toolbar-clear"
+                      onClick={() => setConversationDateFilter('')}
+                      aria-label="Xóa lọc ngày"
+                    >
+                      <ClearIcon />
+                    </button>
+                  ) : null}
+                </label>
+                <label className="chat-toolbar-field chat-toolbar-search">
+                  <SearchIcon />
+                  <input
+                    type="search"
+                    placeholder="Tìm tin nhắn"
+                    value={conversationSearch}
+                    onChange={(event) => setConversationSearch(event.target.value)}
+                  />
+                  {deferredConversationSearch.trim() ? (
+                    <span className="chat-search-count">
+                      {matchedMessageIds.length ? `${activeConversationSearchIndex + 1}/${matchedMessageIds.length}` : '0'}
+                    </span>
+                  ) : null}
+                  <button
+                    type="button"
+                    className="chat-toolbar-next"
+                    onClick={gotoNextSearchResult}
+                    disabled={!matchedMessageIds.length}
+                    aria-label="Kết quả tiếp theo"
+                  >
+                    <NextIcon />
+                  </button>
+                </label>
+              </section>
 
               <section className="detail-card detail-card-dark compact-actions-card">
                 <div className="quick-actions single-action">

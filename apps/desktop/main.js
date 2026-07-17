@@ -1,4 +1,4 @@
-const { app, BrowserWindow, Menu, Tray, Notification, nativeImage, ipcMain, shell, session } = require("electron");
+const { app, BrowserWindow, Menu, Tray, Notification, nativeImage, ipcMain, shell, session, systemPreferences } = require("electron");
 const fs = require("fs");
 const path = require("path");
 
@@ -147,6 +147,30 @@ function showMainWindow() {
   }
   mainWindow.show();
   mainWindow.focus();
+}
+
+async function requestMediaAccess(kind = "audio") {
+  if (process.platform !== "darwin") {
+    return { camera: true, microphone: true, settingsOpened: false };
+  }
+
+  const needsCamera = kind === "video";
+  let camera = !needsCamera || systemPreferences.getMediaAccessStatus("camera") === "granted";
+  let microphone = systemPreferences.getMediaAccessStatus("microphone") === "granted";
+
+  if (needsCamera && !camera && systemPreferences.getMediaAccessStatus("camera") === "not-determined") {
+    camera = await systemPreferences.askForMediaAccess("camera");
+  }
+  if (!microphone && systemPreferences.getMediaAccessStatus("microphone") === "not-determined") {
+    microphone = await systemPreferences.askForMediaAccess("microphone");
+  }
+
+  const settingsOpened = !camera || !microphone;
+  if (settingsOpened) {
+    await shell.openExternal("x-apple.systempreferences:com.apple.preference.security?Privacy_Camera");
+  }
+
+  return { camera, microphone, settingsOpened };
 }
 
 function buildTrayMenu() {
@@ -342,7 +366,7 @@ app.whenReady().then(() => {
   });
 
   session.defaultSession.setPermissionRequestHandler((_webContents, permission, callback) => {
-    if (permission === "notifications") {
+    if (permission === "notifications" || permission === "media") {
       callback(true);
       return;
     }
@@ -405,6 +429,10 @@ ipcMain.handle("desktop:notify", async (_event, payload) => {
   return {
     ok: await showNativeNotification(payload),
   };
+});
+
+ipcMain.handle("desktop:request-media-access", async (_event, kind) => {
+  return requestMediaAccess(kind === "video" ? "video" : "audio");
 });
 
 ipcMain.handle("desktop:set-badge-count", (_event, count) => {

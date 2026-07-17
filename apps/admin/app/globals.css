@@ -208,6 +208,22 @@ button:disabled {
   color: #ffb4c0;
 }
 
+.call-permission-error {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.call-permission-error button {
+  flex: none;
+  padding: 7px 10px;
+  border-radius: 9px;
+  background: rgba(255, 255, 255, 0.14);
+  color: inherit;
+  font-size: 12px;
+}
+
 .notice-banner {
   background: #1f3a2d;
   color: #a9e5c2;
@@ -252,6 +268,170 @@ button:disabled {
 .incoming-toast-copy span {
   color: var(--muted);
   font-size: 13px;
+}
+
+.call-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(9, 12, 18, 0.64);
+  backdrop-filter: blur(8px);
+}
+
+.call-card {
+  width: min(360px, 100%);
+  display: grid;
+  justify-items: center;
+  gap: 10px;
+  padding: 32px;
+  border: 1px solid #454d5b;
+  border-radius: 28px;
+  background: #252a33;
+  box-shadow: 0 24px 80px rgba(0, 0, 0, 0.42);
+  text-align: center;
+}
+
+.active-call-card:has(.call-video-stage) {
+  width: min(760px, 100%);
+}
+
+.call-card .avatar {
+  width: 84px;
+  height: 84px;
+  font-size: 28px;
+}
+
+.call-card strong {
+  font-size: 22px;
+}
+
+.call-card > span:not(.call-eyebrow) {
+  color: var(--muted);
+}
+
+.call-eyebrow {
+  color: #9fb8ff;
+  font-size: 13px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+
+.call-video-stage {
+  position: relative;
+  width: 100%;
+  min-height: 260px;
+  overflow: hidden;
+  border-radius: 18px;
+  background: #12161d;
+}
+
+.call-video {
+  display: block;
+  object-fit: cover;
+  background: #171c24;
+}
+
+.call-video.remote {
+  width: 100%;
+  min-height: 260px;
+}
+
+.call-video.local {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  z-index: 1;
+  width: 150px;
+  height: 106px;
+  border: 2px solid rgba(255, 255, 255, 0.72);
+  border-radius: 12px;
+  transform: scaleX(-1);
+}
+
+.call-actions {
+  display: flex;
+  justify-content: center;
+  gap: 16px;
+  width: 100%;
+  margin-top: 18px;
+}
+
+.call-action {
+  position: relative;
+  min-width: 96px;
+  display: block;
+  padding: 65px 12px 10px;
+  color: #f5f7fc;
+  background: transparent;
+  font-size: 12px;
+  line-height: 1.2;
+  text-align: center;
+}
+
+.call-action svg,
+.chat-call-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.call-action::before {
+  content: '';
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: #3e4757;
+  transform: translateX(-50%);
+}
+
+.call-action svg {
+  position: absolute;
+  top: 34px;
+  left: 50%;
+  z-index: 1;
+  transform: translate(-50%, -50%);
+}
+
+.call-action.decline::before {
+  background: #d44e5b;
+}
+
+.call-action.decline svg {
+  transform: translate(-50%, -50%) rotate(135deg);
+}
+
+.call-action.accept::before {
+  background: #28a36a;
+}
+
+.call-action.secondary.active::before {
+  background: #62708a;
+}
+
+.chat-call-button {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 12px;
+  color: #a9c1ff;
+  background: rgba(59, 119, 255, 0.12);
+}
+
+.chat-call-button:hover:not(:disabled) {
+  background: rgba(59, 119, 255, 0.24);
+  color: #dbe7ff;
+}
+
+.chat-call-button:disabled {
+  cursor: not-allowed;
+  opacity: 0.48;
 }
 
 .messenger-shell {
@@ -1443,6 +1623,24 @@ button:disabled {
 
 .compact-actions-card {
   padding: 12px;
+}
+
+.conversation-filter-card {
+  display: grid;
+  gap: 10px;
+}
+
+.conversation-filter-card h3 {
+  margin-bottom: 0;
+}
+
+.conversation-filter-card .chat-toolbar-field {
+  width: 100%;
+}
+
+.conversation-filter-card .chat-toolbar-date,
+.conversation-filter-card .chat-toolbar-search {
+  width: 100%;
 }
 
 .quick-actions.single-action {

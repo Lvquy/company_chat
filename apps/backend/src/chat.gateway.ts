@@ -80,6 +80,10 @@ export class ChatGateway implements OnGatewayConnection, OnGatewayDisconnect {
     });
   }
 
+  emitToConversation(conversationId: string, event: string, payload: unknown) {
+    this.server.to(conversationId).emit(event, payload);
+  }
+
   @SubscribeMessage('conversation:join')
   async joinConversation(
     @ConnectedSocket() client: Socket,
